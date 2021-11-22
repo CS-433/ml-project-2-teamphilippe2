@@ -14,14 +14,3 @@ def predict_test_set(test_set, baseline_model, patch_size):
 
     # Predict using given model 
     return baseline_model.predict(X)
-
-
-def value_to_class(v, threshold=0.25):
-    # Compute features for each image patch in groundtruth
-    # percentage of pixels > 1 required to assign a foreground label to a patch
-    df = np.sum(v)
-    if df > threshold:
-        return 1
-    else:
-        return 0
-

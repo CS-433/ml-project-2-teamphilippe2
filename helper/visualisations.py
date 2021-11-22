@@ -28,3 +28,23 @@ def make_img_overlay(img, predicted_img):
     new_img = Image.blend(background, overlay, 0.2)
     plt.imshow(new_img)
     return new_img
+
+def plot_features_distributions(X):
+    """
+        Plot the distributions of each of the
+        features in X
+        
+        Parameters
+        ----------
+            X :
+                Data to plot
+            
+        Returns 
+        -------
+    """
+    nb_features = X.shape[1]
+
+    for i in range(nb_features):
+        plt.hist(X[:, i], bins=100)
+        plt.title(f'Histogram of feature {i}')
+        plt.show()
