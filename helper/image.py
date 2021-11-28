@@ -10,6 +10,14 @@ def img_float_to_uint8(img):
 def concatenate_images(img, gt_img):
     """
     Concatenate two images side by side
+    Parameters
+    ----------
+        - img: 
+            First image
+        - gt_img: 
+            the second image.
+    Return:
+        - List of patches of images
     """
     nChannels = len(gt_img.shape)
     w = gt_img.shape[0]
@@ -28,7 +36,17 @@ def concatenate_images(img, gt_img):
 
 def img_crop(im, w, h):
     """
-    Divide the images into smaller patches
+    Get patches from the given image
+    Parameters
+    ----------
+        - im: 
+            the image
+        - w: 
+            width of the patch
+        - h: 
+            height of the patch
+    Return:
+        - List of patches of the given image
     """
     list_patches = []
     imgwidth = im.shape[0]
@@ -46,7 +64,13 @@ def img_crop(im, w, h):
 
 def get_img_patches(imgs, patch_size=16):
     """
-    Get patches from all images
+    Get patches from all given images
+    Parameters
+    ----------
+        - imgs: 
+            The images
+    Return:
+        - List of patches of all images
     """
     img_width, img_height = imgs[0].shape[0], imgs[0].shape[1]
     n = len(imgs)
@@ -63,6 +87,18 @@ def get_img_patches(imgs, patch_size=16):
 def get_imgs_gt_patches(imgs, gt_imgs,patch_size = 16):
     """
     Get groundtruth and base images patches
+    Parameters
+    ----------
+        - imgs: 
+            The basic images
+        - gt_imgs: 
+            The groundtruth images
+        - patch_size: 
+            The size of the patches
+    Return:
+        - Tuple:
+            - list of image patches
+            - list of ground truth patches
     """
     return get_img_patches(imgs, patch_size), get_img_patches(gt_imgs, patch_size)
 

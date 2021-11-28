@@ -5,6 +5,17 @@ from models.features_extraction import *
 def predict_test_set(test_set, baseline_model, patch_size):
     """
     Predict if patches in test set images corresponds to a road or not
+    Parameters:
+    -----------
+        - test_set: 
+            All test images
+        - baseline_model:
+            The fitted model to use to make the predictions 
+        - patch_size:
+            The patch size used to crop the test images
+    Returns:
+    -----------
+        List of predictions for the test set
     """
     # Split and linearise patches 
     test_patches = [img_crop(test_set[i], patch_size, patch_size) for i in range(len(test_set))]
