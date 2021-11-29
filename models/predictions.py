@@ -21,7 +21,12 @@ def predict_test_set(test_set, baseline_model, patch_size):
     test_patches = [img_crop(test_set[i], patch_size, patch_size) for i in range(len(test_set))]
     test_patches = np.array([test_patches[i][j] for i in range(len(test_patches)) for j in range(len(test_patches[i]))])   
     #extract features from patches
-    X = np.array([extract_features_2d(test_patches[i]) for i in range(len(test_patches))])
+    X = np.array([extract_baseline_features(test_patches[i]) for i in range(len(test_patches))])
 
     # Predict using given model 
     return baseline_model.predict(X)
+
+def predict_test_set_nn(img_test, nn_model):
+    print("Predicting pixels...")
+    return [nn_model(img) for img in img_tests]
+    
