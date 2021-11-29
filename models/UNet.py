@@ -13,12 +13,15 @@ class UNet (nn.Module):
         in_c = nber_channels
         out_c = nber_filters
         self.fc1 = DownSample(in_c, out_c)
+        
         in_c = out_c
         out_c = out_c*2
         self.fc2 = DownSample(in_c, out_c)
+        
         in_c = out_c
         out_c =out_c*2
         self.fc3 = DownSample(in_c, out_c)
+        
         in_c = out_c
         out_c =out_c*2
         self.fc4 = DownSample(in_c, out_c)
@@ -32,7 +35,9 @@ class UNet (nn.Module):
         temp = out_c
         out_c = in_c
         in_c = temp
-        self.layer_middle_up = nn.convTranspose2d(inc_c, out_c)
+        
+        # Which kernel_size ? 
+        self.layer_middle_up = nn.ConvTranspose2d(in_c, out_c, kernel_size=3)
         
         # decoder
         self.fc5 = UpSample(in_c, out_c)
@@ -41,16 +46,16 @@ class UNet (nn.Module):
         self.fc6 = UpSample(in_c, out_c)
         in_c = out_c
         out_c =out_c//2
-        self.fc7 = Upsample(in_c, out_c)
+        self.fc7 = UpSample(in_c, out_c)
         
         # final layer = 1D convolution + sigmoid
         self.fc8 = nn.Sequential(
             # out channels = 2 because we want only white or black
-            nn.Conv2d(in_channels = out_c, out_channel = 2, kernel_size = 1)
+            nn.Conv2d(in_channels = out_c, out_channels = 2, kernel_size = 1),
             nn.Sigmoid()
         )
         
-    def foward(self, x):
+    def forward(self, x):
         conv1, pool1 = self.fc1(x)
         conv2, pool2 = self.fc2(pool1)
         conv3, pool3 = self.fc3(pool2)
@@ -83,25 +88,48 @@ class DownSample (nn.Module):
         # pool = max pooling
         self.layer = nn.Sequential(
             # BN
-            nn.BatchNorm2d(nber_channels)
+            nn.BatchNorm2d(nber_channels),
             # relu
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
             # conv
-            nn.Conv2d(in_channels = nber_channels, out_channels = nber_filters, kernel_size = 3, padding = 1)
+            nn.Conv2d(in_channels = nber_channels, out_channels = nber_filters, kernel_size = 3, padding = 1),
             # BN
-            nn.BatchNorm2d(nber_filters)
+            nn.BatchNorm2d(nber_filters),
             # relu
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
             # conv
-            nn.Conv2d(in_channels = nber_filters, out_channels = nber_filters, kernel_size = 3, padding = 1)
+            nn.Conv2d(in_channels = nber_filters, out_channels = nber_filters, kernel_size = 3, padding = 1),
         )
         
         #pooling
         self.pool = nn.MaxPool2d(kernel_size = 2, stride = 2)
         
-    def foward(self, x):
+    def forward(self, x):
         conv_out = self.layer(x)
         return conv_out, self.pool(conv_out)
+    
+class UpSample(nn.Module):
+    def __init__(self, num_channels, num_filters):
+        super().__init__()
+        self.num_channels = num_channels
+        self.num_filters = num_filters
+        
+        conv = Convolutions(num_channels, num_filters)
+        trans_conv = nn.ConvTranspose2d(
+            in_channels=num_filters,
+            out_channels=num_filters // 2,
+            kernel_size=3,
+            stride=(2, 2),
+            padding=1,
+            output_padding=1
+        )
+        self.up_samp = nn.Sequential(
+            conv,
+            trans_conv
+        )
+
+    def forward(self, input):
+        return self.up_samp(input)
     
 class Convolutions (nn.Module):
     # convolutions in up sample part
