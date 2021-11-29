@@ -27,6 +27,18 @@ def predict_test_set(test_set, baseline_model, patch_size):
     return baseline_model.predict(X)
 
 def predict_test_set_nn(img_test, nn_model):
+    """
+    Predit if the pixels of the image using the given neural network
+    Parameters:
+    -----------
+        - img_test:
+            All the test set images
+        - nn_model:
+            The model to use to predict
+    Returns:
+    -----------
+        - All the predictions
+    """
     print("Predicting pixels...")
     return [nn_model(img) for img in img_tests]
     
