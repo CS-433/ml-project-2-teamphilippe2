@@ -1,7 +1,10 @@
 import matplotlib.image as mpimg
 import os 
 import numpy as np
+import torch
+from torchvision.transforms.functional import resize
 
+from helper.const import *
 # Helper functions
 def load_image(image_file):
     """
@@ -90,3 +93,36 @@ def split_data(x, y, ratio, seed=1):
 
     return x[idx], y[idx], np.delete(x, idx, axis=0), np.delete(y, idx, axis=0)
     
+def resize_image_test(tensor, resized_width, resized_height):
+    tensor = torch.transpose(tensor, 0, 2)
+    tensor = torch.transpose(tensor, 1, 2)
+    tensor = resize(tensor, [resized_height, resized_width])
+    tensor = torch.transpose(tensor, 1, 2)
+    tensor = torch.transpose(tensor, 0, 2)
+    
+    return tensor
+
+def load_test_set(test_datapath, resized_width, resized_height):
+
+    pref_length = len(test_image_prefix)
+    suf_length = len(test_image_suffix)
+    
+    files = os.listdir(test_datapath)
+    ids = []
+    test_imgs = []
+    orig_size = []
+    
+    for file in files:
+        # Each folder contains only one image
+        im_in_dir =  os.listdir(test_datapath + file)[0]
+        
+        # load image, resize it and transform it to tensor
+        test_img = load_image(test_datapath + file+"/"+im_in_dir)
+        tensor = resize_image_test(torch.from_numpy(test_img), resized_width, resized_height)
+        
+        # Save image on list
+        test_imgs.append(tensor)
+        ids.append(file[pref_length:len(im_in_dir)-suf_length])
+        orig_size.append((test_img.shape[0],test_img.shape[1]))
+        
+    return ids, test_imgs, orig_size
