@@ -67,6 +67,7 @@ class UNet (nn.Module):
         deconv3 = self.fc7(concat3)
         
         output = self.fc8(deconv3)
+        return output
         
         
 class DownSample (nn.Module):
