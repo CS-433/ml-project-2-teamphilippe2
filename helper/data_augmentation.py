@@ -17,20 +17,23 @@ from helper.visualisations import *
 
        
 class AugmentedRoadImages(Dataset):
-    def __init__(self, img_datapath, gt_datapath):
+    def __init__(self, img_datapath, gt_datapath, ratio_test):
         imgs, gt_imgs = load_images_and_groundtruth(img_datapath, gt_datapath)
+        imgs_tr, gt_imgs_tr, imgs_te, gt_imgs_te = split_data(imgs, gt_imgs, ratio_test)
         
-        self.all_imgs = imgs
-        self.gt_imgs = gt_imgs
+        self.test_set = imgs_te, gt_imgs_te
         
-        display_imgs_side_by_side(self.all_imgs[0], self.gt_imgs[0])
+        self.all_imgs = []
+        self.gt_imgs = []
         
-        for img, gt in zip(imgs, gt_imgs):
+        for img, gt in zip(imgs_tr, gt_imgs_tr):
             img_trans, gt_trans = self.transform(img, gt)
             self.all_imgs.extend(img_trans)
             self.gt_imgs.extend(gt_trans)
-            for img_tr,gt_tr in zip(img_trans, gt_trans):
-                display_imgs_side_by_side(img_tr.numpy(), gt_tr.numpy())
+            
+        self.all_imgs.extend(imgs)
+        self.gt_imgs.extend(gt_imgs)
+        
         
         self.n_samples = len(self.all_imgs)
         
@@ -40,6 +43,9 @@ class AugmentedRoadImages(Dataset):
     def __getitem__(self, index):
         return self.all_imgs[index], self.gt_imgs[index]
         
+    def get_test_set(self):
+        return self.test_set
+    
     def transform(self, img, gt):
         # Transform to tensor
         img = torch.from_numpy(img)
@@ -52,21 +58,21 @@ class AugmentedRoadImages(Dataset):
         gt_imgs = []
         
         
-        # Random crop
-        for i in range(5):
+        # Generate 10 random crops
+        for i in range(10):
+            # Random crop of size 200x200 
             i, j, h, w = RandomCrop.get_params(
                 img, output_size=(img.shape[1]//2, img.shape[2]//2))
+            
+            imgs.append(resized_crop(img, i, j, h, w, [img.shape[1], img.shape[2]]))
+            gt_imgs.append(resized_crop(gt, i, j, h, w, [img.shape[1], img.shape[2]]))
 
-
-            imgs.append(resized_crop(img, i, j, h, w, [400, 400]))
-            gt_imgs.append(resized_crop(gt, i, j, h, w, [400, 400]))
-
-       
+        # generate different rotations of the same image
         rotation_angles = [90, 180, 270]
         for angle in rotation_angles: 
             imgs.append(rotate(img, angle))
             gt_imgs.append(rotate(gt, angle))
-        
+            
         imgs = [img.transpose(1,2).transpose(0,2) for img in imgs]
         gt_imgs = [gt_img[0,:,:] for gt_img in gt_imgs]
         
