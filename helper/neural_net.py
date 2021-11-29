@@ -3,6 +3,7 @@ from datetime import datetime
 from helper.metrics import *
 from helper.const import *
 from models.UNet import *
+from models.NNet import *
 from helper.data_augmentation import *
 
 def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True):
@@ -95,6 +96,8 @@ def model_from_string(model_str):
     """
     if model_str == "unet":
         return UNet(400, 64)
+    elif model_str == "nnet":
+        return NNet()
     else:
         return None
 
@@ -152,6 +155,8 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         - seed:
             The seed to use during splitting
     """
+    ds = AugmentedRoadImages(image_dir, gt_dir, ratio_test, seed)
+    
     dataset_train = torch.utils.data.DataLoader(ds,
       batch_size=batch_size,
       shuffle=True
