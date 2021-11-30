@@ -68,19 +68,19 @@ class NNet(nn.Module):
         deconv_1 = self.deconv_1(conv_11)
         
         first_merge = torch.cat((deconv_1, conv_10), 2)
-        after_first_merge = conv_layer_merge_1(first_merge)
+        after_first_merge = self.conv_layer_merge_1(first_merge)
         deconv_2 = self.deconv_2(after_first_merge)
         
         second_merge = torch.cat((deconv_2, conv_10), 2)
-        after_second_merge =conv_layer_merge_2(second_merge)
-        deconv_3 = self.deconv_3(after_first_merge)
+        after_second_merge =self.conv_layer_merge_2(second_merge)
+        deconv_3 = self.deconv_3(after_second_merge)
         
         third_merge = torch.cat((deconv_3, conv_9), 2)
-        after_third_merge =conv_layer_merge_3(third_merge)
-        deconv_4 = self.deconv_4(after_first_merge)
+        after_third_merge =self.conv_layer_merge_3(third_merge)
+        deconv_4 = self.deconv_4(after_third_merge)
         
         fourth_marge = torch.cat((deconv_4, conv_8), 2)
-        after_fourth_merge =conv_layer_merge_4(fourth_marge)
+        after_fourth_merge =self.conv_layer_merge_4(fourth_marge)
         
         return self.sigm(after_fourth_merge)
     

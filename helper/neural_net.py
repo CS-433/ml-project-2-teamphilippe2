@@ -3,7 +3,7 @@ from datetime import datetime
 from helper.metrics import *
 from helper.const import *
 from models.UNet import *
-from models.NNet import *
+from models.NNET import *
 from helper.data_augmentation import *
 
 def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True):
