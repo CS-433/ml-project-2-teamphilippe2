@@ -105,7 +105,22 @@ def get_imgs_gt_patches(imgs, gt_imgs,patch_size = 16):
 # Convert array of labels to an image
 def label_to_img(imgwidth, imgheight, w, h, labels):
     """
-    Convert a list of labels to an image
+    Transform a list of label to a image with the given dimensions
+    Parameters:
+    -----------
+        - imgwidth:
+            The width of the image
+        - imgheight:
+            The height of the image
+        - w: 
+            width of the patch
+        - h: 
+            height of the patch
+        - labels: 
+            List of predicted labels
+    Returns: 
+    ----------
+        An image from the given labels
     """
     im = np.zeros([imgwidth, imgheight])
     idx = 0

@@ -23,10 +23,13 @@ def compute_scores(y_true, y_pred):
     recall = recall_score(y_true, y_pred)
     precision = precision_score(y_true, y_pred)
     accuracy = accuracy_score(y_true, y_pred)
-
-    print(f'F1-score : {f1:.4f}')
-    print(f'Recall : {recall:.4f}')
-    print(f'Precision : {precision:.4f}')
-    print(f'Accuracy : {accuracy:.4f}')
+    print("Performance on the local test set")
+    print(f'\tF1-score : {f1:.4f}')
+    print(f'\tRecall : {recall:.4f}')
+    print(f'\tPrecision : {precision:.4f}')
+    print(f'\tAccuracy : {accuracy:.4f}')
     
     return f1, recall, precision, accuracy
+
+def accuracy(y_true, y_pred):
+    return accuracy_score(y_true, y_pred)
