@@ -52,7 +52,7 @@ class AugmentedRoadImages(Dataset):
             self.all_imgs.extend(img_trans)
             self.gt_imgs.extend(gt_trans)
             
-        self.all_imgs.extend([torch.from_numpy(img) for img in imgs])
+        self.all_imgs.extend([torch.permute(torch.from_numpy(img), (2, 0, 1)) for img in imgs])
         self.gt_imgs.extend([torch.from_numpy(gt) for gt in gt_imgs])
         self.n_samples = len(self.all_imgs)
         
@@ -68,8 +68,7 @@ class AugmentedRoadImages(Dataset):
     def transform(self, img, gt):
         # Transform to tensor and transform (W,H,3) into (3,W,H)
         img = torch.from_numpy(img)
-        img = torch.transpose(img, 0, 2)
-        img = torch.transpose(img, 1, 2)
+        img = torch.permute(img, (2, 0, 1))
         # Create a 3D tesnsor from the groundtruth image
         gt = torch.unsqueeze(torch.from_numpy(gt), dim=0).expand(img.shape)
         
@@ -93,7 +92,7 @@ class AugmentedRoadImages(Dataset):
             gt_imgs.append(rotate(gt, angle))
         
         # Retransform the image from (3,W,H) to (W,H,3)
-        imgs = [img.transpose(1,2).transpose(0,2) for img in imgs]
+        #imgs = [img for img in imgs]
         # Only select the first dimension to transform back the groundtruth to a 2D image
         gt_imgs = [gt_img[0,:,:] for gt_img in gt_imgs]
         

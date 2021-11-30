@@ -5,6 +5,7 @@ from helper.const import *
 from models.UNet import *
 from models.NNET import *
 from helper.data_augmentation import *
+from models.autoencoder import Encoder, Decoder, AutoEncoder
 from models.predictions import predict_test_set_nn
 
 
@@ -82,6 +83,8 @@ def loss_function_from_string(loss_fct_str):
     """
     if loss_fct_str == "cross-entropy":
         return torch.nn.CrossEntropyLoss()
+    elif loss_fct_str == "bce":
+        return torch.nn.BCELoss()
     else:
         return None
     
@@ -100,6 +103,8 @@ def model_from_string(model_str):
         return UNet(400, 64)
     elif model_str == "nnet":
         return NNet()
+    elif model_str == "autoencoder":
+        return AutoEncoder()
     else:
         return None
 
@@ -127,7 +132,7 @@ def optimizer_from_string(optimizer_str, params, lr,momentum):
     else:
         return None
 
-def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3, momentum=0.0, batch_size = 100, save_weights=True,ratio_test=0.2, seed=1):
+def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3, momentum=0.0, batch_size = 100, save_weights=True, ratio_test=0.2, seed=1):
     """
     Fully train the asked neural network, save the weights and test the accuracy on the test set. 
     Parameters:
