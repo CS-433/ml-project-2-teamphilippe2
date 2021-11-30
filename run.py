@@ -1,6 +1,8 @@
 import torch
 from datetime import datetime
 
+from  torchvision.transforms.functional import resize
+
 from helper.loading import *
 from helper.submission import *
 from helper.const import *
@@ -20,7 +22,7 @@ def main():
     # Make predictions for the test set
     y_test_pred = predict_test_set_nn(test_set, model)
     # Resize image to original size
-    resize_pred = [resize_image_test(pred, width, height) for pred, (height, width) in zip(y_test_pred, orig_size)]
+    resize_pred = [torch.permute(resize(pred, width, height),(1,2,0)) for pred, (height, width) in zip(y_test_pred, orig_size)]
     
     print('==> Creating submission file...\n')
     # Save the submission file

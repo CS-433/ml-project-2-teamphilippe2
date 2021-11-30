@@ -37,7 +37,6 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
         model.train()
         for batch_x, batch_y in dataset_train:
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
-
             # Evaluate the network (forward pass)
             prediction = model(batch_x)
             loss = criterion(prediction, batch_y)
@@ -52,7 +51,7 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
         # Test the quality on the test set
         # Disable dropout and batch-norm layers for instance
         model.eval()
-        
+
         # Disable gradients computation
         torch.no_grad()
 
@@ -64,7 +63,7 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
             prediction = model(batch_x)
             accuracies_test.append(accuracy(prediction, batch_y))
         if print_iteration:
-            print("Epoch {} | Test accuracy: {:.5f}".format(epoch, sum(accuracies_test).item()/len(accuracies_test)))
+            print("Epoch {} | Test accuracy: {:.5f}".format(epoch, sum(accuracies_test).item() / len(accuracies_test)))
     print("End of training")
     return model
 
@@ -84,7 +83,8 @@ def loss_function_from_string(loss_fct_str):
         return torch.nn.CrossEntropyLoss()
     else:
         return None
-    
+
+
 def model_from_string(model_str):
     """
     Return the model corresponding to the given string
@@ -103,7 +103,8 @@ def model_from_string(model_str):
     else:
         return None
 
-def optimizer_from_string(optimizer_str, params, lr,momentum):
+
+def optimizer_from_string(optimizer_str, params, lr, momentum):
     """
     Return the optimiser corresponding to the given string
     Parameters: 
@@ -122,12 +123,14 @@ def optimizer_from_string(optimizer_str, params, lr,momentum):
     """
     if optimizer_str == "Adam":
         return torch.optim.Adam(params, lr=lr, momentum=momentum)
-    elif optimizer_str=="SGD":
+    elif optimizer_str == "SGD":
         return torch.optim.SGD(params, lr=lr, momentum=momentum)
     else:
         return None
 
-def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3, momentum=0.0, batch_size = 100, save_weights=True,ratio_test=0.2, seed=1):
+
+def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3,
+                   momentum=0.0, batch_size=100, save_weights=True, ratio_test=0.2, seed=1):
     """
     Fully train the asked neural network, save the weights and test the accuracy on the test set. 
     Parameters:
@@ -158,14 +161,14 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
             The seed to use during splitting
     """
     ds = AugmentedRoadImages(image_dir, gt_dir, ratio_test, seed)
-    
+
     dataset_train = torch.utils.data.DataLoader(ds,
-      batch_size=batch_size,
-      shuffle=True
-    )
-    
+                                                batch_size=batch_size,
+                                                shuffle=True
+                                                )
+
     device = torch.device("cuda")
-    
+
     # If a GPU is available, use it
     if not torch.cuda.is_available():
         print("Things will go much quicker with a GPU")
@@ -174,18 +177,18 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
     # Train the logistic regression model with the Adam optimizer
     criterion = loss_function_from_string(loss_fct_str)
     model = model_from_string(model_str).to(device)
-    optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate,momentum)
-    
+    optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate, momentum)
+
     train(model, criterion, dataset_train, ds.get_test_set(), device, optimizer, num_epochs)
-    
+
     if save_weights:
         now = datetime.now()
-        torch.save(model.state_dict(), weights_folder+model_str+"/"+now.strftime("%Y-%m-%d_%H-%M-%S")+ext_weight_model)
-    
+        torch.save(model.state_dict(),
+                   weights_folder + model_str + "/" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
+
     # Compute scores on the local test set 
     img_test, gt_test = ds.get_test_set()
     preds = predict_test_set_nn(img_test, model)
-    
+
     # Display scores
     _, _, _, _ = compute_scores(preds, gt_test)
-    
