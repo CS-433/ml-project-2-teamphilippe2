@@ -5,6 +5,8 @@ from helper.const import *
 from models.UNet import *
 from models.NNET import *
 from helper.data_augmentation import *
+from models.predictions import predict_test_set_nn
+
 
 def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True):
     """
@@ -119,9 +121,9 @@ def optimizer_from_string(optimizer_str, params, lr,momentum):
         - The corresponding optimiser
     """
     if optimizer_str == "Adam":
-        return torch.optim.Adam(params, lr=learning_rate, momentum=momentum)
+        return torch.optim.Adam(params, lr=lr, momentum=momentum)
     elif optimizer_str=="SGD":
-        return torch.optim.SGD(params, lr=learning_rate, momentum=momentum)
+        return torch.optim.SGD(params, lr=lr, momentum=momentum)
     else:
         return None
 
@@ -182,7 +184,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
     
     # Compute scores on the local test set 
     img_test, gt_test = ds.get_test_set()
-    predict_test_set_nn(img_test, model)
+    preds = predict_test_set_nn(img_test, model)
     
     # Display scores
     _, _, _, _ = compute_scores(preds, gt_test)
