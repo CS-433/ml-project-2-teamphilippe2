@@ -103,6 +103,24 @@ class DownSample (nn.Module):
         conv_out = self.layer(x)
         return conv_out, self.pool(conv_out)
     
+class UpSample (nn.Module):
+    # conv + transpose conv
+    def __init__(self, nber_channels, nber_filters):
+        super().__init__()
+        
+        self.nber_channels = nber_channels
+        self.nber_filters = nber_filters
+        
+        # layer = convolution*2 + transpose convolution
+        self.layer = nn.Sequential(
+            Convolutions(nber_channels, nber_filters)
+            # definir tous les autres parameters
+            nn.ConvTranspose2d(nber_filters, nber_filters//2, kernel_size = 3, padding = 1, output_padding = 1, stride=(2,2))
+        )
+    def foward(self, x):
+        return self.layer(x)
+    
+    
 class Convolutions (nn.Module):
     # convolutions in up sample part
     def __init__(self,nber_channels, nber_filters):
