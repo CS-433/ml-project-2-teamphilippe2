@@ -65,7 +65,7 @@ class AugmentedRoadImages(Dataset):
         return self.test_set
 
     def transform(self, img, gt):
-        # Transform to tensor and transform (W,H,3) into (3,W,H)
+        # Transform to tensor and transform (H,W,3) into (3,H,W)
         img = torch.from_numpy(img)
         img = torch.permute(img, (2, 0, 1))
         # Create a 3D tesnsor from the groundtruth image
