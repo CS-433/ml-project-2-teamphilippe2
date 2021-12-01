@@ -5,10 +5,12 @@ from helper.const import *
 from models.UNet import *
 from models.NNET import *
 from helper.data_augmentation import *
+from models.autoencoder import AutoEncoder
 from models.predictions import predict_test_set_nn
 
 
-def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True):
+def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True,
+          autoencoder=False):
     """
     Fully train a neural network
     Parameters:
@@ -27,6 +29,8 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
             The number of training passes over the whole dataset we need to make (int)
         print_iterations:
             If we want to print a summary of performance after an epoch
+        autoencoder:
+            Boolean indicating whether we are training an autoencoder
     Returns:
     -----------
         model: The trained model
@@ -37,11 +41,14 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
         model.train()
         for batch_x, batch_y in dataset_train:
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+
             # Evaluate the network (forward pass)
             prediction = model(batch_x)
-            print(prediction.shape)
-            print(batch_y.shape)
-            loss = criterion(prediction, batch_y)
+
+            if autoencoder:
+                loss = criterion(prediction, batch_x)
+            else:
+                loss = criterion(prediction, batch_y)
 
             # Compute the gradient
             optimizer.zero_grad()
@@ -55,20 +62,19 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
         model.eval()
 
         # Disable gradients computation
-        torch.no_grad()
+        with torch.no_grad():
+            accuracies_test = []
+            for batch_x, batch_y in dataset_test:
+                batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
-        accuracies_test = []
-        for batch_x, batch_y in dataset_test:
-            batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+                # Evaluate the network (forward pass)
+                prediction = model(batch_x)
+                prediction[prediction >= 0.5] = 1
+                prediction[prediction < 0.5] = 0
 
-            # Evaluate the network (forward pass)
-            prediction = model(batch_x)
-            prediction[prediction >= 0.5] = 1
-            prediction[prediction < 0.5] = 0
-
-            accuracies_test.append((batch_y.detach().numpy() == prediction.detach().numpy()).mean())
-        if print_iteration:
-            print("Epoch {} | Test accuracy: {:.5f}".format(epoch, sum(accuracies_test).item() / len(accuracies_test)))
+                accuracies_test.append((batch_y.detach().numpy() == prediction.detach().numpy()).mean())
+            if print_iteration:
+                print("Epoch {} | Test accuracy: {:.5f}".format(epoch, sum(accuracies_test).item() / len(accuracies_test)))
     print("End of training")
     return model
 
@@ -88,6 +94,8 @@ def loss_function_from_string(loss_fct_str):
         return torch.nn.CrossEntropyLoss()
     elif loss_fct_str == "bce":
         return torch.nn.BCELoss()
+    elif loss_fct_str == "mse":
+        return torch.nn.MSELoss()
     else:
         return None
 
@@ -107,6 +115,8 @@ def model_from_string(model_str):
         return UNet(400, 64)
     elif model_str == "nnet":
         return NNet()
+    elif model_str == "autoencoder":
+        return AutoEncoder()
     else:
         return None
 
@@ -137,7 +147,7 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
 
 
 def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3,
-                   momentum=0.0, batch_size=100, save_weights=True, ratio_test=0.2, seed=1):
+                   momentum=0.0, batch_size=100, save_weights=True, ratio_test=0.2, seed=1, autoencoder=False):
     """
     Fully train the asked neural network, save the weights and test the accuracy on the test set. 
     Parameters:
@@ -166,6 +176,8 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
             The train-test set split ratio
         - seed:
             The seed to use during splitting
+        - autoencoder:
+            Boolean indicating whether we are training an autoencoder
     """
     ds = AugmentedRoadImages(image_dir, gt_dir, ratio_test, seed)
 
@@ -188,12 +200,24 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
     model = model_from_string(model_str).to(device)
     optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate, momentum)
 
-    train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs)
+    train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, autoencoder=autoencoder)
 
     if save_weights:
         now = datetime.now()
-        torch.save(model.state_dict(),
-                   weights_folder + model_str + "/" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
+
+        # If we used an autoencoder,
+        # separate the weights files
+        if autoencoder:
+            # Save encoder weights
+            torch.save(model.encoder.state_dict(),
+                       weights_folder + model_str + "/encoder_" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
+
+            # Save decoder weights
+            torch.save(model.decoder.state_dict(),
+                       weights_folder + model_str + "/decoder_" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
+        else:
+            torch.save(model.state_dict(),
+                       weights_folder + model_str + "/" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
 
     # Compute scores on the local test set 
     img_test, gt_test = ds.get_test_set()
