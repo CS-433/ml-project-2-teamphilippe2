@@ -118,7 +118,7 @@ def resize_image_test(tensor, resized_width, resized_height):
     # Transform the tensor from (H,W,3) to (3,H,W)
     tensor = torch.permute(tensor, (2, 0, 1))
 
-    # Resize the image to th  given dimensions
+    # Resize the image to the given dimensions
     tensor = resize(tensor, [resized_height, resized_width])
 
     return tensor
