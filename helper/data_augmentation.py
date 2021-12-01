@@ -17,6 +17,16 @@ class RoadTestImages(Dataset):
         return self.test_data[index], self.test_ground_truth[index]
 
 
+def to_tensor_and_permute(imgs):
+    imgs_new = []
+    for img in imgs:
+        # Transform to tensor and transform (H,W,3) into (3,H,W)
+        img = torch.from_numpy(img)
+        img = torch.permute(img, (2, 0, 1))
+        imgs_new.append(img)
+    return imgs_new
+
+
 class AugmentedRoadImages(Dataset):
     """
     Custom class to load our training dataset
@@ -43,9 +53,10 @@ class AugmentedRoadImages(Dataset):
         imgs_tr, gt_imgs_tr, imgs_te, gt_imgs_te = split_data(imgs, gt_imgs, ratio_test, seed=seed)
 
         # Set the test set and transform the images to tensor and permute ground_truth data.
-        self.test_set = self.to_tensor_and_permute(imgs_te), [self.cap_ground_truth(torch.from_numpy(gt_te)) for gt_te in gt_imgs_te]
+        self.test_set = to_tensor_and_permute(imgs_te), [self.cap_ground_truth(torch.from_numpy(gt_te)) for gt_te in gt_imgs_te]
+
         # Transform the training images to tensor and permute the axes to obtain (3, H, W)
-        imgs_tr = self.to_tensor_and_permute(imgs_tr)
+        imgs_tr = to_tensor_and_permute(imgs_tr)
 
         self.all_imgs = []
         self.gt_imgs = []
@@ -77,15 +88,6 @@ class AugmentedRoadImages(Dataset):
             The test set
         """
         return self.test_set[0], self.test_set[1]
-
-    def to_tensor_and_permute(self, imgs):
-        imgs_new = []
-        for img in imgs:
-            # Transform to tensor and transform (H,W,3) into (3,H,W)
-            img = torch.from_numpy(img)
-            img = torch.permute(img, (2, 0, 1))
-            imgs_new.append(img)
-        return imgs_new
 
     def transform(self, img, gt):
         """
@@ -129,3 +131,22 @@ class AugmentedRoadImages(Dataset):
             gt_imgs2.append(gt[None, :, :])
 
         return imgs, gt_imgs2
+
+
+class OriginalTrainingRoadImages(Dataset):
+    """
+    Original, non augmented training images.
+    """
+    def __init__(self, img_datapath):
+        # Load all training images in folder
+        imgs = load_all_images_in_folder(img_datapath)
+
+        self.imgs = to_tensor_and_permute(imgs)
+
+        self.n_samples = len(self.imgs)
+
+    def __len__(self):
+        return self.n_samples
+
+    def __getitem__(self, item):
+        return self.imgs[item]

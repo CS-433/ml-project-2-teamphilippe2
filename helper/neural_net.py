@@ -225,3 +225,18 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
 
     # Display scores
     _, _, _, _ = compute_scores(preds, gt_test)
+
+
+def load_model_weights(model, weights_path):
+    """
+    Loads the weights from the given file
+    Parameters:
+    -----------
+        - model:
+            Model of the network
+        - weights_path:
+            Path of the file
+    Returns:
+    -----------
+    """
+    model.load_state_dict(torch.load(weights_path))
