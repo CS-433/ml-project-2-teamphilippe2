@@ -1,5 +1,6 @@
 from sklearn.metrics import f1_score, recall_score, precision_score, accuracy_score
 
+
 def compute_scores(y_true, y_pred):
     """
         Compute and print the following scores :
@@ -28,8 +29,5 @@ def compute_scores(y_true, y_pred):
     print(f'\tRecall : {recall:.4f}')
     print(f'\tPrecision : {precision:.4f}')
     print(f'\tAccuracy : {accuracy:.4f}')
-    
-    return f1, recall, precision, accuracy
 
-def accuracy(y_true, y_pred):
-    return accuracy_score(y_true, y_pred)
+    return f1, recall, precision, accuracy
