@@ -46,32 +46,39 @@ class Decoder(nn.Module):
         super().__init__()
 
         # First fully connected layer
-        self.fc = nn.Linear(64, 256)
+        self.fc = nn.Linear(64, 2048)
 
         # First deconvolution
-        self.deconv1 = nn.ConvTranspose2d(32, 16, 3)
+        self.deconv1 = nn.ConvTranspose2d(32, 16, 3, stride=(2, 2))
 
         # Second deconvolution
-        self.deconv2 = nn.ConvTranspose2d(16, 8, 5)
+        self.deconv2 = nn.ConvTranspose2d(16, 8, 5, stride=(2, 2))
 
         # Third deconvolution
-        self.deconv3 = nn.ConvTranspose2d(8, 3, 5)
+        self.deconv3 = nn.ConvTranspose2d(8, 3, 5, stride=(2, 2))
 
     def forward(self, x):
+        print('decoder')
         x = relu(self.fc(x))
         x = dropout(x, p=0.25, training=self.training)
-
-        # Reshape into 32 feature maps
-        x = x.view(-1, 32)
+        print(x.shape)
+        # Reshape into 32 feature maps,
+        # keeping the batch size
+        x = x.view(x.shape[0], 32, 8, 8)
         x = relu(self.deconv1(x))
+        print(x.shape)
         x = relu(self.deconv2(x))
+        print(x.shape)
         x = self.deconv3(x)
-
+        print(x.shape)
+        print('decoder')
         return x
 
 
 class AutoEncoder(nn.Module):
     def __init__(self):
+        super().__init__()
+
         self.encoder = Encoder()
         self.decoder = Decoder()
 
