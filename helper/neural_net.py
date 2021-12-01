@@ -39,6 +39,8 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
             # Evaluate the network (forward pass)
             prediction = model(batch_x)
+            print(prediction.shape)
+            print(batch_y.shape)
             loss = criterion(prediction, batch_y)
 
             # Compute the gradient
@@ -61,7 +63,10 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
 
             # Evaluate the network (forward pass)
             prediction = model(batch_x)
-            accuracies_test.append(accuracy(prediction, batch_y))
+            prediction[prediction >= 0.5] = 1
+            prediction[prediction < 0.5] = 0
+
+            accuracies_test.append((batch_y.detach().numpy() == prediction.detach().numpy()).mean())
         if print_iteration:
             print("Epoch {} | Test accuracy: {:.5f}".format(epoch, sum(accuracies_test).item() / len(accuracies_test)))
     print("End of training")
@@ -81,6 +86,8 @@ def loss_function_from_string(loss_fct_str):
     """
     if loss_fct_str == "cross-entropy":
         return torch.nn.CrossEntropyLoss()
+    elif loss_fct_str == "bce":
+        return torch.nn.BCELoss()
     else:
         return None
 
@@ -121,9 +128,9 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
     -----------
         - The corresponding optimiser
     """
-    if optimizer_str == "Adam":
-        return torch.optim.Adam(params, lr=lr, momentum=momentum)
-    elif optimizer_str == "SGD":
+    if optimizer_str == "adam":
+        return torch.optim.Adam(params, lr=lr)
+    elif optimizer_str == "sgd":
         return torch.optim.SGD(params, lr=lr, momentum=momentum)
     else:
         return None
@@ -166,6 +173,8 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
                                                 batch_size=batch_size,
                                                 shuffle=True
                                                 )
+    dstest = RoadTestImages(ds)
+    dataset_test = torch.utils.data.DataLoader(dstest, batch_size=batch_size, shuffle=True)
 
     device = torch.device("cuda")
 
@@ -179,7 +188,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
     model = model_from_string(model_str).to(device)
     optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate, momentum)
 
-    train(model, criterion, dataset_train, ds.get_test_set(), device, optimizer, num_epochs)
+    train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs)
 
     if save_weights:
         now = datetime.now()
