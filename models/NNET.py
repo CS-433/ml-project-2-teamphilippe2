@@ -8,103 +8,90 @@ class NNet(nn.Module):
         super().__init__()
 
         channel = 64
+        self.res_block1 = ResBlock(in_channel, channel, 2, batch_norm)
+        self.res_block2 = ResBlock(channel, channel * 2, 2, batch_norm)
+        self.res_block3 = ResBlock(channel * 2, channel * 4, 3, batch_norm)
+        self.res_block4 = ResBlock(channel * 4, channel * 8, 3, batch_norm)
+        self.res_block5 = ResBlock(channel * 8, channel * 16, 1, batch_norm)
 
-        self.conv_layer_1 = get_conv_relu(in_channel, channel, 2, batch_norm)
+        self.conv_layer_8 = nn.Conv2d(in_channels=channel * 2, out_channels=3, kernel_size=3,padding=1)
+        self.conv_layer_9 = nn.Conv2d(in_channels=channel * 4, out_channels=3, kernel_size=3,padding=1)
+        self.conv_layer_10 = nn.Conv2d(in_channels=channel * 8, out_channels=3, kernel_size=3,padding=1)
+        self.conv_layer_11 = nn.Conv2d(in_channels=channel * 16, out_channels=3, kernel_size=3,padding=1)
 
-        self.pool_1 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv_layer_2 = get_conv_relu(channel, channel * 2, 2, batch_norm)
-        self.pool_2 = nn.MaxPool2d(kernel_size=2, stride=2)
-
-        self.conv_layer_8 = nn.Conv2d(in_channels=channel * 2, out_channels=3, kernel_size=3)
-
-        self.conv_layer_3 = get_conv_relu(channel * 2, channel * 4, 3, batch_norm)
-        self.pool_3 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv_layer_9 = nn.Conv2d(in_channels=channel * 4, out_channels=3, kernel_size=3)
-
-        self.conv_layer_4 = get_conv_relu(channel * 4, channel * 8, 3, batch_norm)
-        self.pool_4 = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv_layer_10 = nn.Conv2d(in_channels=channel * 8, out_channels=3, kernel_size=3)
-
-        self.conv_layer_6 = get_conv_relu(channel * 8, channel * 16, 1, batch_norm)
         self.drop_out_1 = nn.Dropout(p=0.5, inplace=True)
 
-        self.conv_layer_11 = nn.Conv2d(in_channels=channel * 16, out_channels=3, kernel_size=3)
+        self.conv_layer_merge_1 = get_merge_conv_layer()
+        self.conv_layer_merge_2 = get_merge_conv_layer()
+        self.conv_layer_merge_3 = get_merge_conv_layer()
 
-        self.conv_layer_merge_1 = nn.Conv2d(in_channels=6, out_channels=3, kernel_size=3)
-        self.conv_layer_merge_2 = nn.Conv2d(in_channels=6, out_channels=3, kernel_size=3)
-        self.conv_layer_merge_3 = nn.Conv2d(in_channels=6, out_channels=3, kernel_size=3)
+        self.deconv_5 = get_deconv_layer()
+        self.deconv_4 = get_deconv_layer()
+        self.deconv_2 = get_deconv_layer()
+        self.deconv_3 = get_deconv_layer()
+        self.deconv_1 = nn.ConvTranspose2d(in_channels=3, out_channels=3, kernel_size=4, stride=(2, 2),
+                                           output_padding=1, padding=1)
 
-        self.deconv_1 = nn.ConvTranspose2d(in_channels=3, out_channels=3, kernel_size=3, stride=(2,2), output_padding=1,padding=1)
-        self.deconv_2 = nn.ConvTranspose2d(in_channels=3, out_channels=3, kernel_size=3,stride=(2,2), output_padding=1,padding=1)
-        self.deconv_3 = nn.ConvTranspose2d(in_channels=3, out_channels=3, kernel_size=3, stride=(2,2), output_padding=1,padding=1)
-        self.deconv_4 = nn.ConvTranspose2d(in_channels=3, out_channels=3, kernel_size=3, stride=(2,2), output_padding=1,padding=1)
-
+        self.final_conv = nn.Conv2d(in_channels=in_channel, out_channels=1, kernel_size=3, padding=1)
         self.sigm = nn.Sigmoid()
 
     def forward(self, x):
-        conv1 = self.conv_layer_1(x)
-        pool_1 = self.pool_1(conv1)
-        print(f"Conv 1: {conv1.shape}")
-        print(f"Pool 1: {pool_1.shape}")
-        conv2 = self.conv_layer_2(pool_1)
-        pool_2 = self.pool_2(conv2)
-        print(f"Conv 2: {conv2.shape}")
-        print(f"Pool 2: {pool_2.shape}")
-        conv3 = self.conv_layer_3(pool_2)
-        pool_3 = self.pool_3(conv3)
-        print(f"Conv 3: {conv3.shape}")
-        print(f"Pool 3: {pool_3.shape}")
+        res_block1 = self.res_block1(x)
 
-        conv4 = self.conv_layer_4(pool_3)
-        pool_4 = self.pool_4(conv4)
-        print(f"Conv 4: {conv4.shape}")
-        print(f"Pool 4: {pool_4.shape}")
+        res_block2 = self.res_block2(res_block1)
 
-        conv_8 = self.conv_layer_8(pool_2)
-        conv_9 = self.conv_layer_9(pool_3)
-        conv_10 = self.conv_layer_10(pool_4)
+        res_block3 = self.res_block3(res_block2)
 
-        conv6 = self.conv_layer_6(pool_4)
-        drop_1 = self.drop_out_1(conv6)
-        print(f"Conv 6: {conv6.shape}")
-        print(f"Drop 1: {drop_1.shape}")
+        res_block4 = self.res_block4(res_block3)
 
+        res_block5 = self.res_block5(res_block4)
+        drop_1 = self.drop_out_1(res_block5)
+
+        conv_8 = self.conv_layer_8(res_block2)
+        conv_9 = self.conv_layer_9(res_block3)
+        conv_10 = self.conv_layer_10(res_block4)
         conv_11 = self.conv_layer_11(drop_1)
+
         deconv_1 = self.deconv_1(conv_11)
-        print(f"Conv 11: {conv_11.shape}")
+        concat1 = torch.cat((deconv_1, conv_10), 1)
+        merge1 = self.conv_layer_merge_1(concat1)
+        deconv_2 = self.deconv_2(merge1)
 
-        print(f"Deconv_1: {deconv_1.shape}")
-        print(f"Conv_10: {conv_10.shape}")
+        concat2 = torch.cat((deconv_2, conv_9), 1)
+        merge2 = self.conv_layer_merge_2(concat2)
+        deconv_3 = self.deconv_3(merge2)
 
-        first_merge = torch.cat((deconv_1, conv_10), 1)
-        after_first_merge = self.conv_layer_merge_1(first_merge)
-        print(f"Conv after deconv_1: {deconv_1.shape}")
-        deconv_2 = self.deconv_2(after_first_merge)
-        print(f"Deconv_2: {deconv_2.shape}")
-        print(f"Conv_9: {conv_9.shape}")
+        concat3 = torch.cat((deconv_3, conv_8),1)
+        merge3 = self.conv_layer_merge_3(concat3)
+        deconv_4 = self.deconv_4(merge3)
+        deconv_5 = self.deconv_5(deconv_4)
+        final_conv = self.final_conv(deconv_5)
 
-        second_merge = torch.cat((deconv_2, conv_9), 1)
-        after_second_merge = self.conv_layer_merge_2(second_merge)
-        print(f"Conv after deconv_2: {deconv_1.shape}")
-        deconv_3 = self.deconv_3(after_second_merge)
+        return self.sigm(final_conv)
 
-        print(f"Deconv_3: {deconv_2.shape}")
-        print(f"Conv_8: {conv_9.shape}")
+class ResBlock(nn.Module):
+    def __init__(self, in_chan, out_chan, nb, batch_norm):
+        super().__init__()
+        layers = []
+        for i in range(nb):
+            layers.append(nn.Conv2d(in_channels=in_chan, out_channels=out_chan, kernel_size=3, padding=1))
 
-        third_merge = torch.cat((deconv_3, conv_8))
-        after_third_merge = self.conv_layer_merge_4(third_merge)
-        print(f"Conv after deconv_3: {deconv_1.shape}")
-        deconv_4 = self.deconv_4(after_third_merge)
-        print(f"Deconv_4: {deconv_2.shape}")
+            if batch_norm:
+                layers.append(nn.BatchNorm2d(in_chan))
 
-        return self.sigm(deconv_4)
+            layers.append(nn.ReLU(inplace=True))
+            in_chan = out_chan
+
+        layers.append(nn.MaxPool2d(kernel_size=2, stride=2))
+        self.all_lays = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.all_lays(x)
 
 
-def get_conv_relu(in_chan, out_chan, nb, batch_norm):
-    layers = []
-    for i in range(nb):
-        layers.append(nn.Conv2d(in_channels=in_chan, out_channels=out_chan, kernel_size=3))
-        layers.append(nn.ReLU(inplace=True))
-        in_chan = out_chan
+def get_deconv_layer():
+    return nn.ConvTranspose2d(in_channels=3, out_channels=3, kernel_size=3, stride=(2, 2),
+                              output_padding=1, padding=1)
 
-    return nn.Sequential(*layers)
+def get_merge_conv_layer():
+    return nn.Conv2d(in_channels=6, out_channels=3, kernel_size=3, padding=1)
