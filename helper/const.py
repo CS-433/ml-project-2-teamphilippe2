@@ -5,6 +5,7 @@ image_dir = training_dir + "images/"
 gt_dir = training_dir + "groundtruth/"
 output_folder = "output/"
 weights_folder = output_folder+ "weights/"
+features_folder = output_folder + "features/"
 submission_folder = output_folder + "submissions/"
 
 

@@ -8,6 +8,20 @@ from helper.neural_net import load_model_weights
 
 
 def extract_features_encoder(encoder, image_dir, weights_path, features_file):
+    """
+    Extract the patch features with the given trained encoder.
+    Parameters:
+    -----------
+        - encoder:
+            The trained encoder
+        - image_dir:
+            The directory containing the images
+        - weights_path:
+            The path to the file containing the trained weights
+            for the encoder
+        - features_file:
+             The file where to save the extracted features matrix
+        """
     # Load the trained encoder
     load_model_weights(encoder, weights_path)
 
