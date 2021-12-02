@@ -7,35 +7,32 @@ class Encoder(nn.Module):
         super().__init__()
 
         # First level of convolutions
-        # input 400x400x3
-        self.conv1 = nn.Conv2d(3, 16, 5)
+        # input 16x16x3
+        self.conv1 = nn.Conv2d(3, 32, 5, padding=2)
 
         # Second level of convolutions
-        # input x400x16
-        self.conv2 = nn.Conv2d(16, 32, 5)
+        self.conv2 = nn.Conv2d(32, 64, 3)
 
         # Third level of convolutions
-        self.conv3 = nn.Conv2d(32, 64, 3)
+        self.conv3 = nn.Conv2d(64, 128, 3)
 
         # Max pooling
         self.maxpool = nn.MaxPool2d(2)
 
         # Fully Connected layer
-        self.fc = nn.Linear(64*47*47, 64)
+        self.fc = nn.Linear(128*5*5, 16)
 
     def forward(self, x):
         x = relu(self.conv1(x))
-        x = self.maxpool(x)
 
         x = relu(self.conv2(x))
         x = self.maxpool(x)
 
         x = relu(self.conv3(x))
-        x = self.maxpool(x)
 
         # Flatten the feature maps into a vector
-        # torch.Size([B, 64, 47, 47])
-        x = x.view(-1, 64*47*47)
+        # torch.Size([B, 128, 5, 5])
+        x = x.view(-1, 128*5*5)
         x = dropout(x, p=0.25, training=self.training)
 
         return self.fc(x)
@@ -46,10 +43,11 @@ class Decoder(nn.Module):
         super().__init__()
 
         # First fully connected layer
-        self.fc = nn.Linear(64, 80_000)
+        self.fc = nn.Linear(16, 128)
 
         # First deconvolution
-        self.deconv1 = nn.ConvTranspose2d(32, 16, 3, stride=(2, 2), padding=1, output_padding=1)
+        self.first_deconv_channels = 32
+        self.deconv1 = nn.ConvTranspose2d(self.first_deconv_channels, 16, 3, stride=(2, 2), padding=1, output_padding=1)
 
         # Second deconvolution
         self.deconv2 = nn.ConvTranspose2d(16, 8, 3, stride=(2, 2), padding=1)
@@ -63,7 +61,7 @@ class Decoder(nn.Module):
 
         # Reshape into 32 feature maps,
         # keeping the batch size
-        x = x.view(x.shape[0], 32, 50, 50)
+        x = x.view(x.shape[0], self.first_deconv_channels, 2, 2)
         x = relu(self.deconv1(x))
 
         x = relu(self.deconv2(x))

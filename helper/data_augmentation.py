@@ -3,6 +3,7 @@ from torch.utils.data import Dataset
 from torchvision.transforms import *
 from torchvision.transforms.functional import *
 
+from helper.image import get_img_patches
 from helper.loading import *
 
 
@@ -133,20 +134,53 @@ class AugmentedRoadImages(Dataset):
         return imgs, gt_imgs2
 
 
-class OriginalTrainingRoadImages(Dataset):
+class OriginalTrainingRoadPatches(Dataset):
     """
-    Original, non augmented training images.
+    Original, non augmented training patches.
     """
-    def __init__(self, img_datapath):
+    def __init__(self, img_datapath, patch_size=16):
         # Load all training images in folder
         imgs = load_all_images_in_folder(img_datapath)
 
-        self.imgs = to_tensor_and_permute(imgs)
+        # Get all the patches from the images
+        # np array (nb patches, patch_size, patch_size, 3)
+        patches = get_img_patches(imgs, patch_size=patch_size)
 
-        self.n_samples = len(self.imgs)
+        # Convert to correct Tensor format
+        self.patches = to_tensor_and_permute(patches)
+
+        self.n_samples = len(self.patches)
 
     def __len__(self):
         return self.n_samples
 
     def __getitem__(self, item):
-        return self.imgs[item]
+        # For autoencoder, target is the original image
+        return self.patches[item], self.patches[item]
+
+
+class OriginalTestRoadPatches(Dataset):
+    def __init__(self, img_datapath, patch_size=16):
+        # Load all test images in folder
+        # Keep original size
+        ids, imgs, _ = load_test_set(img_datapath, test_img_width, test_img_height)
+
+        # imgs is a list of (C, H, W), need numpy (W, H, C)
+        # to extract patches
+        imgs = [torch.permute(img, (2, 1, 0)).numpy() for img in imgs]
+
+        # Get all the patches from the images
+        # np array (nb patches, patch_size, patch_size, 3)
+        patches = get_img_patches(imgs, patch_size=patch_size)
+
+        # Convert to correct Tensor format
+        self.patches = to_tensor_and_permute(patches)
+
+        self.n_samples = len(self.patches)
+
+    def __len__(self):
+        return self.n_samples
+
+    def __getitem__(self, item):
+        # For autoencoder, target is the original image
+        return self.patches[item], self.patches[item]

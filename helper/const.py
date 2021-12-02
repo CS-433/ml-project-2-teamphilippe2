@@ -22,3 +22,5 @@ test_image_suffix = ".jpg"
 # Size of images used as input to the neural network
 train_img_height = 400
 train_img_width = 400
+test_img_width = 608
+test_img_height = 608

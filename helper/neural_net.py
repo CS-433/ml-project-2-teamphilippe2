@@ -9,8 +9,7 @@ from models.autoencoder import AutoEncoder
 from models.predictions import predict_test_set_nn
 
 
-def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True,
-          autoencoder=False):
+def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True):
     """
     Fully train a neural network
     Parameters:
@@ -29,8 +28,6 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
             The number of training passes over the whole dataset we need to make (int)
         print_iterations:
             If we want to print a summary of performance after an epoch
-        autoencoder:
-            Boolean indicating whether we are training an autoencoder
     Returns:
     -----------
         model: The trained model
@@ -44,11 +41,7 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
 
             # Evaluate the network (forward pass)
             prediction = model(batch_x)
-
-            if autoencoder:
-                loss = criterion(prediction, batch_x)
-            else:
-                loss = criterion(prediction, batch_y)
+            loss = criterion(prediction, batch_y)
 
             # Compute the gradient
             optimizer.zero_grad()
@@ -179,14 +172,28 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         - autoencoder:
             Boolean indicating whether we are training an autoencoder
     """
-    ds = AugmentedRoadImages(image_dir, gt_dir, ratio_test, seed)
+    if autoencoder:
+        # Training dataset
+        ds = OriginalTrainingRoadPatches(image_dir)
+        dataset_train = torch.utils.data.DataLoader(ds,
+                                                    batch_size=batch_size,
+                                                    shuffle=True
+                                                    )
 
-    dataset_train = torch.utils.data.DataLoader(ds,
-                                                batch_size=batch_size,
-                                                shuffle=True
-                                                )
-    dstest = RoadTestImages(ds)
-    dataset_test = torch.utils.data.DataLoader(dstest, batch_size=batch_size, shuffle=True)
+        # Test set on true "test" (used for AICrowd) set
+        # as autoencoder is unsupervised
+        dstest = OriginalTestRoadPatches(gt_dir)
+        dataset_test = torch.utils.data.DataLoader(dstest,
+                                                   batch_size=batch_size,
+                                                   shuffle=True)
+    else:
+        ds = AugmentedRoadImages(image_dir, gt_dir, ratio_test, seed)
+        dataset_train = torch.utils.data.DataLoader(ds,
+                                                    batch_size=batch_size,
+                                                    shuffle=True
+                                                    )
+        dstest = RoadTestImages(ds)
+        dataset_test = torch.utils.data.DataLoader(dstest, batch_size=batch_size, shuffle=True)
 
     device = torch.device("cuda")
 
@@ -200,7 +207,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
     model = model_from_string(model_str).to(device)
     optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate, momentum)
 
-    train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, autoencoder=autoencoder)
+    train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs)
 
     if save_weights:
         now = datetime.now()
