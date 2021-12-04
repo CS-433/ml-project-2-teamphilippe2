@@ -22,7 +22,7 @@ class AugmentedRoadImages(Dataset):
     Custom class to load our training dataset
     """
 
-    def __init__(self, img_datapath, gt_datapath, ratio_test, seed):
+    def __init__(self, img_datapath, gt_datapath, ratio_train, seed):
         """
         Load and split the dataset
         
@@ -40,7 +40,7 @@ class AugmentedRoadImages(Dataset):
         # Load train images
         imgs, gt_imgs = load_images_and_groundtruth(img_datapath, gt_datapath)
         # Split the train images into train and test set
-        imgs_tr, gt_imgs_tr, imgs_te, gt_imgs_te = split_data(imgs, gt_imgs, ratio_test, seed=seed)
+        imgs_tr, gt_imgs_tr, imgs_te, gt_imgs_te = split_data(imgs, gt_imgs, ratio_train, seed=seed)
 
         # Set the test set and transform the images to tensor and permute ground_truth data.
         self.test_set = self.to_tensor_and_permute(imgs_te), [self.cap_ground_truth(torch.from_numpy(gt_te)) for gt_te in gt_imgs_te]
@@ -106,7 +106,7 @@ class AugmentedRoadImages(Dataset):
         gt_imgs = [gt]
 
         # Generate 10 random crops
-        for i in range(10):
+        for i in range(30):
             # Get random crop params of size 200x200 
             i, j, h, w = RandomCrop.get_params(
                 img, output_size=(img.shape[1] // 2, img.shape[2] // 2))

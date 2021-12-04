@@ -1,6 +1,7 @@
 from helper.image import *
 import numpy as np
 from models.features_extraction import *
+import torch
     
 def predict_test_set(test_set, baseline_model, patch_size):
     """
@@ -26,7 +27,7 @@ def predict_test_set(test_set, baseline_model, patch_size):
     # Predict using given model 
     return baseline_model.predict(X)
 
-def predict_test_set_nn(img_test, nn_model):
+def predict_test_set_nn(img_tests, nn_model):
     """
     Predit if the pixels of the image using the given neural network
     Parameters:
@@ -40,5 +41,12 @@ def predict_test_set_nn(img_test, nn_model):
         - All the predictions
     """
     print("Predicting pixels...")
-    return [nn_model(img) for img in img_tests]
+    device = torch.device("cuda")
+
+    # If a GPU is available, use it
+    if not torch.cuda.is_available():
+        print("Things will go much quicker with a GPU")
+        device = torch.device("cpu")
+    
+    return [nn_model(img.to(device).unsqueeze(0)).cpu() for img in img_tests]
     

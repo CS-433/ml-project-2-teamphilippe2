@@ -39,7 +39,6 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
             # Evaluate the network (forward pass)
             prediction = model(batch_x)
-            print(prediction.shape)
             loss = criterion(prediction, batch_y)
 
             # Compute the gradient
@@ -136,7 +135,7 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
 
 
 def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3,
-                   momentum=0.0, batch_size=100, save_weights=True, ratio_test=0.2, seed=1):
+                   momentum=0.0, batch_size=100, save_weights=True, ratio_train=0.8, seed=1):
     """
     Fully train the asked neural network, save the weights and test the accuracy on the test set. 
     Parameters:
@@ -166,8 +165,9 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         - seed:
             The seed to use during splitting
     """
-    ds = AugmentedRoadImages(image_dir, gt_dir, ratio_test, seed)
+    ds = AugmentedRoadImages(image_dir, gt_dir, ratio_train, seed)
 
+    print(len(ds))
     dataset_train = torch.utils.data.DataLoader(ds,
                                                 batch_size=batch_size,
                                                 shuffle=True
