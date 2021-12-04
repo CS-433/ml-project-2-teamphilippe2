@@ -40,7 +40,6 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
             # Evaluate the network (forward pass)
             prediction = model(batch_x)
             print(prediction.shape)
-            print(batch_y.shape)
             loss = criterion(prediction, batch_y)
 
             # Compute the gradient
@@ -66,7 +65,7 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
             prediction[prediction >= 0.5] = 1
             prediction[prediction < 0.5] = 0
 
-            accuracies_test.append((batch_y.detach().numpy() == prediction.detach().numpy()).mean())
+            accuracies_test.append((batch_y.cpu().detach().numpy() == prediction.cpu().detach().numpy()).mean())
         if print_iteration:
             print("Epoch {} | Test accuracy: {:.5f}".format(epoch, sum(accuracies_test).item() / len(accuracies_test)))
     print("End of training")
@@ -175,7 +174,6 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
                                                 )
     dstest = RoadTestImages(ds)
     dataset_test = torch.utils.data.DataLoader(dstest, batch_size=batch_size, shuffle=True)
-
     device = torch.device("cuda")
 
     # If a GPU is available, use it
@@ -185,6 +183,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
 
     # Train the logistic regression model with the Adam optimizer
     criterion = loss_function_from_string(loss_fct_str)
+    torch.cuda.empty_cache()
     model = model_from_string(model_str).to(device)
     optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate, momentum)
 

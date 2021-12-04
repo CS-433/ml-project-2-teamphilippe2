@@ -60,7 +60,7 @@ class AugmentedRoadImages(Dataset):
         self.n_samples = len(self.all_imgs)
 
     def __len__(self):
-        return 1  # self.n_samples
+        return self.n_samples
 
     def __getitem__(self, index):
         return self.all_imgs[index], self.gt_imgs[index]
