@@ -9,7 +9,8 @@ from models.autoencoder import AutoEncoder
 from models.predictions import predict_test_set_nn
 
 
-def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True):
+def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True,
+          autoencoder=False):
     """
     Fully train a neural network
     Parameters:
@@ -28,6 +29,8 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
             The number of training passes over the whole dataset we need to make (int)
         print_iterations:
             If we want to print a summary of performance after an epoch
+        autoencoder:
+            Whether we are training the autoencoder
     Returns:
     -----------
         model: The trained model
@@ -56,18 +59,32 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
 
         # Disable gradients computation
         with torch.no_grad():
-            accuracies_test = []
-            for batch_x, batch_y in dataset_test:
-                batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+            # Evaluate the loss on the test set for the autoencoder
+            if autoencoder:
+                test_losses = 0
+                for batch_x, batch_y in dataset_test:
+                    batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
-                # Evaluate the network (forward pass)
-                prediction = model(batch_x)
-                prediction[prediction >= 0.5] = 1
-                prediction[prediction < 0.5] = 0
+                    prediction = model(batch_x)
 
-                accuracies_test.append((batch_y.detach().numpy() == prediction.detach().numpy()).mean())
-            if print_iteration:
-                print("Epoch {} | Test accuracy: {:.5f}".format(epoch, sum(accuracies_test).item() / len(accuracies_test)))
+                    test_losses += criterion(prediction,  batch_y).item()
+
+                if print_iteration:
+                    print(f"Epoch {epoch} | Avg test loss: {test_losses / len(dataset_test):.5f}")
+            else:
+                # Evaluate the accuracy on the test set for the autoencoder
+                accuracies_test = []
+                for batch_x, batch_y in dataset_test:
+                    batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+
+                    # Evaluate the network (forward pass)
+                    prediction = model(batch_x)
+                    prediction[prediction >= 0.5] = 1
+                    prediction[prediction < 0.5] = 0
+
+                    accuracies_test.append((batch_y.detach().numpy() == prediction.detach().numpy()).mean())
+                if print_iteration:
+                    print("Epoch {} | Test accuracy: {:.5f}".format(epoch, sum(accuracies_test).item() / len(accuracies_test)))
     print("End of training")
     return model
 
@@ -207,7 +224,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
     model = model_from_string(model_str).to(device)
     optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate, momentum)
 
-    train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs)
+    train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, autoencoder=autoencoder)
 
     if save_weights:
         now = datetime.now()
