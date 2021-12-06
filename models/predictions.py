@@ -27,7 +27,16 @@ def predict_test_set(test_set, baseline_model, patch_size):
     # Predict using given model 
     return baseline_model.predict(X)
 
-def predict_test_set_nn(img_tests, nn_model):
+def pred_single_img_nnet(nn_model, img, device, threshold):
+    dev_img = img.unsqueeze(0).to(device)
+    pred = nn_model(dev_img).detach().cpu().numpy()
+    
+    pred[pred<=0.5]=0
+    pred[pred>0.5]=1
+    
+    return pred
+
+def predict_test_set_nn(img_tests, nn_model, threshold = 0.5):
     """
     Predit if the pixels of the image using the given neural network
     Parameters:
@@ -48,5 +57,5 @@ def predict_test_set_nn(img_tests, nn_model):
         print("Things will go much quicker with a GPU")
         device = torch.device("cpu")
     
-    return [nn_model(img.to(device).unsqueeze(0)).cpu() for img in img_tests]
+    return [pred_single_img_nnet(nn_model, img, device, threshold) for img in img_tests]
     
