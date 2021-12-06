@@ -5,6 +5,7 @@ image_dir = training_dir + "images/"
 gt_dir = training_dir + "groundtruth/"
 output_folder = "output/"
 weights_folder = output_folder+ "weights/"
+features_folder = output_folder + "features/"
 submission_folder = output_folder + "submissions/"
 
 
@@ -22,3 +23,5 @@ test_image_suffix = ".jpg"
 # Size of images used as input to the neural network
 train_img_height = 400
 train_img_width = 400
+test_img_width = 608
+test_img_height = 608
