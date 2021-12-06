@@ -7,17 +7,17 @@ class NNet(nn.Module):
     def __init__(self, in_channel=3, batch_norm=False):
         super().__init__()
 
-        channel = 16
+        channel = 32
         self.res_block1 = ResBlock(in_channel, channel, 2, batch_norm)
         self.res_block2 = ResBlock(channel, channel * 2, 2, batch_norm)
         self.res_block3 = ResBlock(channel * 2, channel * 4, 3, batch_norm)
         self.res_block4 = ResBlock(channel * 4, channel * 8, 3, batch_norm)
-        self.res_block5 = ResBlock(channel * 8, channel * 8, 1, batch_norm)
+        self.res_block5 = ResBlock(channel * 8, channel * 16, 1, batch_norm)
 
         self.conv_layer_8 = nn.Conv2d(in_channels=channel * 2, out_channels=3, kernel_size=3,padding=1)
         self.conv_layer_9 = nn.Conv2d(in_channels=channel * 4, out_channels=3, kernel_size=3,padding=1)
         self.conv_layer_10 = nn.Conv2d(in_channels=channel * 8, out_channels=3, kernel_size=3,padding=1)
-        self.conv_layer_11 = nn.Conv2d(in_channels=channel * 8, out_channels=3, kernel_size=3,padding=1)
+        self.conv_layer_11 = nn.Conv2d(in_channels=channel * 16, out_channels=3, kernel_size=3,padding=1)
 
         self.drop_out_1 = nn.Dropout(p=0.5, inplace=True)
 
