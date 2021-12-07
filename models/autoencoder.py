@@ -83,11 +83,11 @@ class Decoder(nn.Module):
 
 
 class AutoEncoder(nn.Module):
-    def __init__(self):
+    def __init__(self, encoder=Encoder(), decoder=Decoder()):
         super().__init__()
 
-        self.encoder = Encoder()
-        self.decoder = Decoder()
+        self.encoder = encoder
+        self.decoder = decoder
 
     def forward(self, x):
         x = self.encoder(x)
