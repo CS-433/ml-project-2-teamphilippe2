@@ -16,28 +16,23 @@ class Encoder(nn.Module):
         # Third level of convolutions
         self.conv3 = nn.Conv2d(64, 128, 3)
 
-        # Fourth level of convolutions
-        self.conv4 = nn.Conv2d(128, 128, 3)
-
-        # Fifth level of convolutions
-        self.conv5 = nn.Conv2d(128, 128, 3)
-
         # Max pooling
         self.maxpool = nn.MaxPool2d(2)
 
         # Fully Connected layer
-        self.fc = nn.Linear(128*8*8, 12)
+        self.fc = nn.Linear(128*5*5, 16)
 
     def forward(self, x):
         x = relu(self.conv1(x))
+
         x = relu(self.conv2(x))
+        x = self.maxpool(x)
+
         x = relu(self.conv3(x))
-        x = relu(self.conv4(x))
-        x = relu(self.conv5(x))
 
         # Flatten the feature maps into a vector
-        # torch.Size([B, 128, 8, 8])
-        x = x.view(-1, 128*8*8)
+        # torch.Size([B, 128, 5, 5])
+        x = x.view(-1, 128*5*5)
         x = dropout(x, p=0.25, training=self.training)
 
         return self.fc(x)
@@ -48,23 +43,17 @@ class Decoder(nn.Module):
         super().__init__()
 
         # First fully connected layer
-        self.fc = nn.Linear(12, 2048)
+        self.fc = nn.Linear(16, 128)
 
         # First deconvolution
-        self.first_deconv_channels = 128
-        self.deconv1 = nn.ConvTranspose2d(self.first_deconv_channels, 128, 3)
+        self.first_deconv_channels = 32
+        self.deconv1 = nn.ConvTranspose2d(self.first_deconv_channels, 16, 3, stride=(2, 2), padding=1, output_padding=1)
 
         # Second deconvolution
-        self.deconv2 = nn.ConvTranspose2d(128, 64, 3)
+        self.deconv2 = nn.ConvTranspose2d(16, 8, 3, stride=(2, 2), padding=1)
 
         # Third deconvolution
-        self.deconv3 = nn.ConvTranspose2d(64, 32, 3)
-
-        # Fourth deconvolution
-        self.deconv4 = nn.ConvTranspose2d(32, 16, 3)
-
-        # Fifth deconvolution
-        self.deconv5 = nn.ConvTranspose2d(16, 3, 5)
+        self.deconv3 = nn.ConvTranspose2d(8, 3, 5, stride=(2, 2), padding=1, output_padding=1)
 
     def forward(self, x):
         x = relu(self.fc(x))
@@ -72,12 +61,11 @@ class Decoder(nn.Module):
 
         # Reshape into 32 feature maps,
         # keeping the batch size
-        x = x.view(x.shape[0], self.first_deconv_channels, 4, 4)
+        x = x.view(x.shape[0], self.first_deconv_channels, 2, 2)
         x = relu(self.deconv1(x))
+
         x = relu(self.deconv2(x))
-        x = relu(self.deconv3(x))
-        x = relu(self.deconv4(x))
-        x = self.deconv5(x)
+        x = self.deconv3(x)
 
         return x
 
