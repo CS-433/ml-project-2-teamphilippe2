@@ -43,7 +43,7 @@ class Encoder(nn.Module):
         # Flatten the feature maps into a vector
         # torch.Size([B, 512, 4, 4])
         x = x.view(-1, 512*4*4)
-        x = dropout(x, p=0.25, training=self.training)
+        #x = dropout(x, p=0.25, training=self.training)
 
         return self.fc(x)
 
