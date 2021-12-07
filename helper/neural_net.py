@@ -172,7 +172,7 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
 
 
 def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3,
-                   momentum=0.0, batch_size=16, save_weights=True, ratio_test=0.2, seed=1, autoencoder=False,
+                   momentum=0.0, batch_size=16, save_weights=True, ratio_train=0.8, seed=1, autoencoder=False,
                   lr_scheduler=False, lr_schedule=(10, 0.1), verbose=True):
 
     """
@@ -234,7 +234,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
                                                    shuffle=True)
     else:
         # Training dataset
-        ds = AugmentedRoadImages(image_dir, gt_dir, ratio_test, seed)
+        ds = AugmentedRoadImages(image_dir, gt_dir, ratio_train, seed)
         dataset_train = torch.utils.data.DataLoader(ds,
                                                     batch_size=batch_size,
                                                     shuffle=True
