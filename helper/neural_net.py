@@ -10,7 +10,7 @@ from models.predictions import predict_test_set_nn
 
 
 def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True,
-          autoencoder=False):
+          autoencoder=False, scheduler=None):
     """
     Fully train a neural network
     Parameters:
@@ -31,10 +31,17 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
             If we want to print a summary of performance after an epoch
         autoencoder:
             Whether we are training the autoencoder
+        scheduler:
+            Learning rate scheduler (None if do not use a scheduler)
     Returns:
     -----------
         model: The trained model
+        train_losses: Losses on the train set
+        test_losses: Losses on the test set
     """
+    test_losses = []
+    train_losses = []
+    
     print("Starting training")
     for epoch in range(num_epochs):
         # Train an epoch
@@ -45,6 +52,7 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
             # Evaluate the network (forward pass)
             prediction = model(batch_x)
             loss = criterion(prediction, batch_y)
+            train_losses.append(loss.item())
 
             # Compute the gradient
             optimizer.zero_grad()
@@ -61,16 +69,18 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
         with torch.no_grad():
             # Evaluate the loss on the test set for the autoencoder
             if autoencoder:
-                test_losses = 0
+                test_losses_sum = 0
                 for batch_x, batch_y in dataset_test:
                     batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
                     prediction = model(batch_x)
 
-                    test_losses += criterion(prediction,  batch_y).item()
+                    t_loss = criterion(prediction,  batch_y).item()
+                    test_losses.append(t_loss)
+                    test_losses_sum += t_loss
 
                 if print_iteration:
-                    print(f"Epoch {epoch} | Avg test loss: {test_losses / len(dataset_test):.5f}")
+                    print(f"Epoch {epoch} | Avg test loss: {test_losses_sum / len(dataset_test):.5f}")
             else:
                 # Evaluate the accuracy on the test set for the autoencoder
                 accuracies_test = []
@@ -85,8 +95,13 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
                     accuracies_test.append((batch_y.detach().numpy() == prediction.detach().numpy()).mean())
                 if print_iteration:
                     print("Epoch {} | Test accuracy: {:.5f}".format(epoch, sum(accuracies_test).item() / len(accuracies_test)))
+                    
+        # Update the lr scheduler
+        if scheduler is not None:
+            scheduler.step()
+    
     print("End of training")
-    return model
+    return model, train_losses, test_losses
 
 
 def loss_function_from_string(loss_fct_str):
@@ -157,7 +172,8 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
 
 
 def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3,
-                   momentum=0.0, batch_size=100, save_weights=True, ratio_test=0.2, seed=1, autoencoder=False):
+                   momentum=0.0, batch_size=16, save_weights=True, ratio_test=0.2, seed=1, autoencoder=False,
+                  lr_scheduler=False, lr_schedule=(10, 0.1)):
     """
     Fully train the asked neural network, save the weights and test the accuracy on the test set. 
     Parameters:
@@ -188,6 +204,14 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
             The seed to use during splitting
         - autoencoder:
             Boolean indicating whether we are training an autoencoder
+        - lr_scheduler:
+            Boolean indicating whether to use a learning rate scheduler
+        - lr_schedule:
+            Tuple (epochs step, division factor) for the learning rate scheduler
+    Returns: 
+    -----------
+        - Train losses
+        - Test losses
     """
     if autoencoder:
         # Training dataset
@@ -223,8 +247,13 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
     criterion = loss_function_from_string(loss_fct_str)
     model = model_from_string(model_str).to(device)
     optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate, momentum)
+    
+    scheduler = None
+    if lr_scheduler:
+       # Use a step lr scheduler
+       scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_schedule[0], gamma=lr_schedule[1])
 
-    train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, autoencoder=autoencoder)
+    _, train_losses, test_losses = train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, autoencoder=autoencoder, scheduler=scheduler)
 
     if save_weights:
         now = datetime.now()
@@ -243,12 +272,15 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
             torch.save(model.state_dict(),
                        weights_folder + model_str + "/" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
 
-    # Compute scores on the local test set 
-    img_test, gt_test = ds.get_test_set()
-    preds = predict_test_set_nn(img_test, model)
+    if not autoencoder:
+        # Compute scores on the local test set 
+        img_test, gt_test = ds.get_test_set()
+        preds = predict_test_set_nn(img_test, model)
 
-    # Display scores
-    _, _, _, _ = compute_scores(preds, gt_test)
+        # Display scores
+        _, _, _, _ = compute_scores(preds, gt_test)
+    
+    return train_losses, test_losses
 
 
 def load_model_weights(model, weights_path):
