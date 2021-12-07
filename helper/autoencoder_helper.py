@@ -64,3 +64,4 @@ def extract_features_encoder(encoder, image_dir, weights_path):
     print(f'Features saved in {file_path}')
 
     return X
+
