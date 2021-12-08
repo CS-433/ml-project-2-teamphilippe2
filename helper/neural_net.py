@@ -1,7 +1,6 @@
 import torch
 from datetime import datetime
 from helper.metrics import *
-from helper.const import *
 from models.UNet import *
 from models.NNET import *
 from helper.data_augmentation import *
