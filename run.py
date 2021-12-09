@@ -18,6 +18,7 @@ def load_model(weight_path, model):
         - weight_path: The path to the weight we need to load
         - model : the model object we need to load the weights into
     """
+    print("Used weights "+weight_path)
     # Restore the state of the model
     model.load_state_dict(torch.load(weight_path))
     

@@ -137,7 +137,7 @@ def model_from_string(model_str):
         - The corresponding model
     """
     if model_str == "unet":
-        return UNet(400, 64)
+        return UNet(3, 32)
     elif model_str == "nnet":
         return NNet()
     elif model_str == "autoencoder":
