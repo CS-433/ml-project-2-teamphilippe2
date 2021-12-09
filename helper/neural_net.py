@@ -1,7 +1,7 @@
 import torch
 from datetime import datetime
 from helper.metrics import *
-from models.UNet import *
+from models.UNet_orig import *
 from models.NNET import *
 from helper.data_augmentation import *
 from models.autoencoder import AutoEncoder
@@ -136,7 +136,7 @@ def model_from_string(model_str):
         - The corresponding model
     """
     if model_str == "unet":
-        return UNet(3, 32)
+        return UNet(3, 64)
     elif model_str == "nnet":
         return NNet()
     elif model_str == "autoencoder":
@@ -254,6 +254,8 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
 
     # Create the model
     model = model_from_string(model_str).to(device)
+
+    print(f"Number of parameters in the model {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
     
     # Create the asked loss
     criterion = loss_function_from_string(loss_fct_str)
