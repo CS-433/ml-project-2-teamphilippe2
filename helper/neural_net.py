@@ -4,10 +4,12 @@ from helper.metrics import *
 from models.UNet import *
 from models.NNET import *
 from helper.data_augmentation import *
+from models.autoencoder import AutoEncoder
 from models.predictions import predict_test_set_nn
 
 
-def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True):
+def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True,
+          autoencoder=False, scheduler=None):
     """
     Fully train a neural network
     Parameters:
@@ -26,21 +28,31 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
             The number of training passes over the whole dataset we need to make (int)
         print_iterations:
             If we want to print a summary of performance after an epoch
+        autoencoder:
+            Whether we are training the autoencoder
+        scheduler:
+            Learning rate scheduler (None if do not use a scheduler)
     Returns:
     -----------
         model: The trained model
+        train_losses: Losses on the train set
+        test_losses: Losses on the test set
     """
+    accuracies_test = []
+    test_losses = []
+    train_losses = []
+    
     print("Starting training")
     for epoch in range(num_epochs):
         # Train an epoch
         model.train()
         for batch_x, batch_y in dataset_train:
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+
             # Evaluate the network (forward pass)
             prediction = model(batch_x)
-            print(prediction.shape)
-            print(batch_y.shape)
             loss = criterion(prediction, batch_y)
+            train_losses.append(loss.item())
 
             # Compute the gradient
             optimizer.zero_grad()
@@ -54,22 +66,41 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
         model.eval()
 
         # Disable gradients computation
-        torch.no_grad()
+        with torch.no_grad():
+            # Evaluate the loss on the test set for the autoencoder
+            if autoencoder:
+                test_losses_sum = 0
+                for batch_x, batch_y in dataset_test:
+                    batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
-        accuracies_test = []
-        for batch_x, batch_y in dataset_test:
-            batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+                    prediction = model(batch_x)
 
-            # Evaluate the network (forward pass)
-            prediction = model(batch_x)
-            prediction[prediction >= 0.5] = 1
-            prediction[prediction < 0.5] = 0
+                    t_loss = criterion(prediction,  batch_y).item()
+                    test_losses.append(t_loss)
+                    test_losses_sum += t_loss
 
-            accuracies_test.append((batch_y.detach().numpy() == prediction.detach().numpy()).mean())
-        if print_iteration:
-            print("Epoch {} | Test accuracy: {:.5f}".format(epoch, sum(accuracies_test).item() / len(accuracies_test)))
+                if print_iteration:
+                    print(f"Epoch {epoch} | Avg test loss: {test_losses_sum / len(dataset_test):.5f}")
+            else:
+                # Evaluate the accuracy on the test set for the other models
+                for batch_x, batch_y in dataset_test:
+                    batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+
+                    # Evaluate the network (forward pass)
+                    prediction = model(batch_x)
+                    prediction[prediction >= 0.5] = 1
+                    prediction[prediction < 0.5] = 0
+                    
+                accuracies_test.append((batch_y.cpu().detach().numpy() == prediction.cpu().detach().numpy()).mean())
+                if print_iteration:
+                    print("Epoch {} | Test accuracy: {:.5f}".format(epoch, sum(accuracies_test).item() / len(accuracies_test)))
+                    
+        # Update the lr scheduler
+        if scheduler is not None:
+            scheduler.step()
+    
     print("End of training")
-    return model
+    return train_losses, test_losses, accuracies_test
 
 
 def loss_function_from_string(loss_fct_str):
@@ -87,6 +118,8 @@ def loss_function_from_string(loss_fct_str):
         return torch.nn.CrossEntropyLoss()
     elif loss_fct_str == "bce":
         return torch.nn.BCELoss()
+    elif loss_fct_str == "mse":
+        return torch.nn.MSELoss()
     else:
         return None
 
@@ -103,9 +136,11 @@ def model_from_string(model_str):
         - The corresponding model
     """
     if model_str == "unet":
-        return UNet(400, 64)
+        return UNet(3, 32)
     elif model_str == "nnet":
         return NNet()
+    elif model_str == "autoencoder":
+        return AutoEncoder()
     else:
         return None
 
@@ -136,7 +171,9 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
 
 
 def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3,
-                   momentum=0.0, batch_size=100, save_weights=True, ratio_test=0.2, seed=1):
+                   momentum=0.0, batch_size=16, save_weights=True, ratio_train=0.8, seed=1, autoencoder=False,
+                  lr_scheduler=False, lr_schedule=(10, 0.1), verbose=True):
+
     """
     Fully train the asked neural network, save the weights and test the accuracy on the test set. 
     Parameters:
@@ -165,16 +202,48 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
             The train-test set split ratio
         - seed:
             The seed to use during splitting
+        - autoencoder:
+            Boolean indicating whether we are training an autoencoder
+        - lr_scheduler:
+            Boolean indicating whether to use a learning rate scheduler
+        - lr_schedule:
+            Tuple (epochs step, division factor) for the learning rate scheduler
+        - verbose:
+            Boolean indicating whether to print the loss in each epoch
+    Returns: 
+    -----------
+        - Train losses
+        - Test losses
     """
-    ds = AugmentedRoadImages(image_dir, gt_dir, ratio_test, seed)
+    torch.cuda.empty_cache()
 
-    dataset_train = torch.utils.data.DataLoader(ds,
-                                                batch_size=batch_size,
-                                                shuffle=True
-                                                )
-    dstest = RoadTestImages(ds)
-    dataset_test = torch.utils.data.DataLoader(dstest, batch_size=batch_size, shuffle=True)
+    if autoencoder:
+        # Training dataset
+        ds = OriginalTrainingRoadPatches(image_dir)
+        dataset_train = torch.utils.data.DataLoader(ds,
+                                                    batch_size=batch_size,
+                                                    shuffle=True
+                                                    )
 
+        # Test set on true "test" (used for AICrowd) set
+        # as autoencoder is unsupervised
+        dstest = OriginalTestRoadPatches(gt_dir)
+        dataset_test = torch.utils.data.DataLoader(dstest,
+                                                   batch_size=batch_size,
+                                                   shuffle=True)
+    else:
+        # Training dataset
+        ds = AugmentedRoadImages(image_dir, gt_dir, ratio_train, seed)
+        dataset_train = torch.utils.data.DataLoader(ds,
+                                                    batch_size=batch_size,
+                                                    shuffle=True
+                                                 )
+        # Test set on true "test" (used for AICrowd) set
+        dstest = RoadTestImages(ds)
+        dataset_test = torch.utils.data.DataLoader(dstest, batch_size=batch_size, shuffle=True)
+
+
+    # Try to move the model to the GPU or the CPU
     device = torch.device("cuda")
 
     # If a GPU is available, use it
@@ -182,21 +251,62 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         print("Things will go much quicker with a GPU")
         device = torch.device("cpu")
 
-    # Train the logistic regression model with the Adam optimizer
-    criterion = loss_function_from_string(loss_fct_str)
-    model = model_from_string(model_str).to(device)
-    optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate, momentum)
 
-    train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs)
+    # Create the model
+    model = model_from_string(model_str).to(device)
+    
+    # Create the asked loss
+    criterion = loss_function_from_string(loss_fct_str)
+    
+    # load the optimiser
+    optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate, momentum)
+    
+    scheduler = None
+    if lr_scheduler:
+       # Use a step lr scheduler
+       scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_schedule[0], gamma=lr_schedule[1])
+
+    train_losses, test_losses, accuracies_test = train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, autoencoder=autoencoder, scheduler=scheduler, print_iteration=verbose)
 
     if save_weights:
         now = datetime.now()
-        torch.save(model.state_dict(),
-                   weights_folder + model_str + "/" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
 
-    # Compute scores on the local test set 
-    img_test, gt_test = ds.get_test_set()
-    preds = predict_test_set_nn(img_test, model)
+        # If we used an autoencoder,
+        # separate the weights files
+        if autoencoder:
+            # Save encoder weights
+            torch.save(model.encoder.state_dict(),
+                       weights_folder + model_str + "/encoder_" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
 
-    # Display scores
-    _, _, _, _ = compute_scores(preds, gt_test)
+            # Save decoder weights
+            torch.save(model.decoder.state_dict(),
+                       weights_folder + model_str + "/decoder_" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
+        else:
+            torch.save(model.state_dict(),
+                       weights_folder + model_str + "/" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
+
+    if not autoencoder:
+        # Compute scores on the local test set 
+        img_test, gt_test = ds.get_test_set()
+        gt_test = [gt.numpy() for gt in gt_test]
+        preds = predict_test_set_nn(img_test, model)
+
+        # Display scores
+        _, _, _, _ = compute_scores(gt_test, preds)
+    
+    return train_losses, test_losses, accuracies_test
+
+
+def load_model_weights(model, weights_path):
+    """
+    Loads the weights from the given file
+    Parameters:
+    -----------
+        - model:
+            Model of the network
+        - weights_path:
+            Path of the file
+    Returns:
+    -----------
+    """
+    model.load_state_dict(torch.load(weights_path))

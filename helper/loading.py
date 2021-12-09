@@ -153,6 +153,7 @@ def load_test_set(test_datapath, resized_width, resized_height):
     ids = []
     test_imgs = []
     orig_size = []
+    files = sorted(files, key=lambda x: int(x[pref_length:]))
 
     for file in files:
         # Each folder contains only one image
@@ -164,7 +165,40 @@ def load_test_set(test_datapath, resized_width, resized_height):
 
         # Save image on list
         test_imgs.append(tensor)
-        ids.append(file[pref_length:len(im_in_dir) - suf_length])
+        ids.append(int(file[pref_length:]))
         orig_size.append((test_img.shape[0], test_img.shape[1]))
 
     return ids, test_imgs, orig_size
+
+
+def save_numpy(X, file):
+    """
+    Save matrix X to disk
+    Parameters:
+    -----------
+        - X:
+            Numpy array to save
+        - file:
+            File to save to
+    Returns:
+    -----------
+    """
+    with open(file, 'wb') as f:
+        np.save(f, X)
+
+
+def load_numpy(file):
+    """
+    Load matrix X from disk
+    Parameters:
+    -----------
+        - file:
+            File to load from
+    Returns:
+    -----------
+        - X:
+            Numpy array loaded
+    """
+    with open(file, 'rb') as f:
+        X = np.load(f)
+    return X
