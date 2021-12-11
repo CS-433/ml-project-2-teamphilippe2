@@ -13,7 +13,7 @@ submission_folder = output_folder + "submissions/"
 ext_weight_model = ".pth"
 
 # Path to the best model weights
-best_model_weight_path = weights_folder + "nnet/2021-12-07_15-07-38"+ext_weight_model
+best_model_weight_path = weights_folder + "unet/2021-12-09_21-47-30"+ext_weight_model
 
 # Testing images related constants
 test_dir = root_dir + "test_set_images/"

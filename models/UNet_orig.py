@@ -108,39 +108,24 @@ class UNet(nn.Module):
 
         # Decoder part
         conv1, pool1 = self.fc1(x)
-        print(f"Conv 1 : {conv1.shape}")
-        print(f"Pool 1 : {pool1.shape}")
         conv2, pool2 = self.fc2(pool1)
-        print(f"Conv 2 : {conv2.shape}")
-        print(f"Pool 2 : {pool2.shape}")
         conv3, pool3 = self.fc3(pool2)
-        print(f"Conv 3 : {conv3.shape}")
-        print(f"Pool 3 : {pool3.shape}")
-
+        
         # Middle of the network
         middle_down = self.layer_middle_down(pool3)#, self.pool(self.layer_middle_down(pool3))
-        print(f"Mid_down : {middle_down.shape}")
-       # print(f"Mid down pool : {middle_down_pool.shape}")
-
+        
         middle_up = self.layer_middle_up(middle_down)
-        print(f"Mid up : {middle_up.shape}")
-
+        
         # Decoder Part
         concat2 = torch.cat((conv3, middle_up), 1)
-        print(f"Concat 2 : {concat2.shape}")
         deconv2 = self.fc6(concat2)
-        print(f"Deconv 2 : {deconv2.shape}")
         concat3 = torch.cat((conv2, deconv2), 1)
-        print(f"Concat 3 : {concat3.shape}")
         deconv3 = self.fc7(concat3)
-        print(f"deconv 3 : {deconv3.shape}")
         concat4 = torch.cat((conv1, deconv3), 1)
-        print(f"Concat 4 : {concat4.shape}")
         #deconv4 = self.fc8(concat4)
         #print(f"deconv 4 : {deconv4.shape}")
 
         output = self.fc9(concat4)
-        print(f"output 4 : {output.shape}")
         return output
 
 

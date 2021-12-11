@@ -136,7 +136,7 @@ def model_from_string(model_str):
         - The corresponding model
     """
     if model_str == "unet":
-        return UNet(3, 64)
+        return UNet(3, 32)
     elif model_str == "nnet":
         return NNet()
     elif model_str == "autoencoder":
@@ -256,6 +256,8 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
     model = model_from_string(model_str).to(device)
 
     print(f"Number of parameters in the model {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
+    if torch.cuda.is_available():
+        print(f"Cuda memory for the model {torch.cuda.memory_allocated()}")
     
     # Create the asked loss
     criterion = loss_function_from_string(loss_fct_str)

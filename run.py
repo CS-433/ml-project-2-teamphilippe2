@@ -8,7 +8,7 @@ from helper.submission import *
 from helper.const import *
 from models.predictions import *
 from models.NNET import *
-#from models.unet import *
+from models.UNet_orig import *
 
 def load_model(weight_path, model):
     """
@@ -39,7 +39,7 @@ def main():
     
     print('\n==> Loading model...\n')
     # Load the model
-    model = NNet()
+    model = UNet(3,32)
     load_model(best_model_weight_path, model)
     
     print('\n==> Predicting labels for the test set...\n')
