@@ -176,7 +176,7 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
 
 def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3,
                    momentum=0.0, batch_size=16, save_weights=True, ratio_test=0.2, seed=1, autoencoder=None,
-                  lr_scheduler=False, lr_schedule=(10, 0.1)):
+                  lr_scheduler=False, lr_schedule=(10, 0.1), test_dir=''):
     """
     Fully train the asked neural network, save the weights and test the accuracy on the test set. 
     Parameters:
@@ -213,6 +213,8 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
             Boolean indicating whether to use a learning rate scheduler
         - lr_schedule:
             Tuple (epochs step, division factor) for the learning rate scheduler
+        - test_dir :
+             the folder containing all the test (AICrowd) images
     Returns: 
     -----------
         - Train losses
@@ -240,7 +242,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
                                                     batch_size=batch_size,
                                                     shuffle=True
                                                     )
-        dstest = OriginalTestRoadImages(gt_dir)
+        dstest = OriginalTestRoadImages(test_dir)
         dataset_test = torch.utils.data.DataLoader(dstest, batch_size=batch_size, shuffle=True)
     else:
         ds = AugmentedRoadImages(image_dir, gt_dir, ratio_test, seed)
