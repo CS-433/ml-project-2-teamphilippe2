@@ -7,7 +7,7 @@ class NNet(nn.Module):
     def __init__(self, in_channel=3, batch_norm=False):
         super().__init__()
 
-        channel = 32
+        channel = 64
         self.res_block1 = ResBlock(in_channel, channel, 2, batch_norm)
         self.res_block2 = ResBlock(channel, channel * 2, 2, batch_norm)
         self.res_block3 = ResBlock(channel * 2, channel * 4, 3, batch_norm)

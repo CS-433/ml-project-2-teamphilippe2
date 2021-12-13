@@ -39,7 +39,8 @@ def main():
     
     print('\n==> Loading model...\n')
     # Load the model
-    model = UNet(3,32)
+    #model = UNet(3,32)
+    model = NNet()
     load_model(best_model_weight_path, model)
     
     print('\n==> Predicting labels for the test set...\n')

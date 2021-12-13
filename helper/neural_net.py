@@ -166,6 +166,8 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
         return torch.optim.Adam(params, lr=lr)
     elif optimizer_str == "sgd":
         return torch.optim.SGD(params, lr=lr, momentum=momentum)
+    elif optimizer_str == "lbfgs":
+        return torch.optim.LBFGS(params, lr=lr)
     else:
         return None
 

@@ -1,0 +1,7 @@
+matplotlib=3.4.3
+torchgeometry=0.1.2
+numpy=1.19.4
+pillow=8.4.0
+pytorch=1.10.0
+torchvision=0.11.1
+sklearn=1.0.1
