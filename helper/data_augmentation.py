@@ -33,7 +33,7 @@ class AugmentedRoadImages(Dataset):
     Custom class to load our training dataset
     """
 
-    def __init__(self, img_datapath, gt_datapath, ratio_test, seed):
+    def __init__(self, img_datapath, gt_datapath, ratio_test, seed, autoencoder=False):
         """
         Load and split the dataset
         
@@ -46,7 +46,9 @@ class AugmentedRoadImages(Dataset):
             - ratio_test: 
                 The split ratio of train-test set 
             - seed: 
-                Seed to split the dataset 
+                Seed to split the dataset
+            - autoencoder:
+                Whether the dataset is used to train the autoencoder
         """
         # Load train images
         imgs, gt_imgs = load_images_and_groundtruth(img_datapath, gt_datapath)
@@ -71,8 +73,16 @@ class AugmentedRoadImages(Dataset):
 
         self.n_samples = len(self.all_imgs)
 
+        # Use the same images as input and output
+        if autoencoder:
+            # For training set
+            self.gt_imgs = self.all_imgs
+
+            # For test set
+            self.test_set = self.test_set[0], self.test_set[0]
+
     def __len__(self):
-        return 1  # self.n_samples
+        return self.n_samples
 
     def __getitem__(self, index):
         return self.all_imgs[index], self.gt_imgs[index]
@@ -184,3 +194,26 @@ class OriginalTestRoadPatches(Dataset):
     def __getitem__(self, item):
         # For autoencoder, target is the original image
         return self.patches[item], self.patches[item]
+
+
+class OriginalTestRoadImages(Dataset):
+    def __init__(self, img_datapath, patch_size=16):
+        # Load all test images in folder
+        # Keep original size
+        ids, imgs, _ = load_test_set(img_datapath, test_img_width, test_img_height)
+
+        # imgs is a list of (C, H, W), need numpy (W, H, C)
+        # to extract patches
+        imgs = [torch.permute(img, (2, 1, 0)).numpy() for img in imgs]
+
+        # Convert to correct Tensor format
+        self.imgs = to_tensor_and_permute(imgs)
+
+        self.n_samples = len(self.imgs)
+
+    def __len__(self):
+        return self.n_samples
+
+    def __getitem__(self, item):
+        # For autoencoder, target is the original image
+        return self.imgs[item], self.imgs[item]
