@@ -10,7 +10,7 @@ from models.predictions import predict_test_set_nn
 
 
 def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True,
-          autoencoder=False, scheduler=None):
+          autoencoder=None, scheduler=None):
     """
     Fully train a neural network
     Parameters:
@@ -30,7 +30,9 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
         print_iterations:
             If we want to print a summary of performance after an epoch
         autoencoder:
-            Whether we are training the autoencoder
+            String indicating whether we are training an autoencoder,
+            and if we use patches or complete images as input. None
+            if we do not train an autoencoder.
         scheduler:
             Learning rate scheduler (None if do not use a scheduler)
     Returns:
@@ -68,7 +70,7 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
         # Disable gradients computation
         with torch.no_grad():
             # Evaluate the loss on the test set for the autoencoder
-            if autoencoder:
+            if autoencoder is not None:
                 test_losses_sum = 0
                 for batch_x, batch_y in dataset_test:
                     batch_x, batch_y = batch_x.to(device), batch_y.to(device)
@@ -172,7 +174,7 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
 
 
 def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3,
-                   momentum=0.0, batch_size=16, save_weights=True, ratio_test=0.2, seed=1, autoencoder=False,
+                   momentum=0.0, batch_size=16, save_weights=True, ratio_test=0.2, seed=1, autoencoder=None,
                   lr_scheduler=False, lr_schedule=(10, 0.1)):
     """
     Fully train the asked neural network, save the weights and test the accuracy on the test set. 
@@ -203,7 +205,9 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         - seed:
             The seed to use during splitting
         - autoencoder:
-            Boolean indicating whether we are training an autoencoder
+            String indicating whether we are training an autoencoder,
+            and if we use patches or complete images as input. None
+            if we do not train an autoencoder.
         - lr_scheduler:
             Boolean indicating whether to use a learning rate scheduler
         - lr_schedule:
@@ -213,7 +217,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         - Train losses
         - Test losses
     """
-    if autoencoder:
+    if autoencoder == 'patches':
         # Training dataset
         ds = OriginalTrainingRoadPatches(image_dir)
         dataset_train = torch.utils.data.DataLoader(ds,
@@ -227,6 +231,16 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         dataset_test = torch.utils.data.DataLoader(dstest,
                                                    batch_size=batch_size,
                                                    shuffle=True)
+    elif autoencoder == 'images':
+        # Use all original training data for training and test on the
+        # AICrowd test set
+        ds = AugmentedRoadImages(image_dir, gt_dir, 1.0, seed, autoencoder=True)
+        dataset_train = torch.utils.data.DataLoader(ds,
+                                                    batch_size=batch_size,
+                                                    shuffle=True
+                                                    )
+        dstest = OriginalTestRoadImages(gt_dir)
+        dataset_test = torch.utils.data.DataLoader(dstest, batch_size=batch_size, shuffle=True)
     else:
         ds = AugmentedRoadImages(image_dir, gt_dir, ratio_test, seed)
         dataset_train = torch.utils.data.DataLoader(ds,
@@ -253,14 +267,15 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
        # Use a step lr scheduler
        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_schedule[0], gamma=lr_schedule[1])
 
-    _, train_losses, test_losses = train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, autoencoder=autoencoder, scheduler=scheduler)
+    _, train_losses, test_losses = train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs,
+                                         autoencoder=autoencoder, scheduler=scheduler)
 
     if save_weights:
         now = datetime.now()
 
         # If we used an autoencoder,
         # separate the weights files
-        if autoencoder:
+        if autoencoder is not None:
             # Save encoder weights
             torch.save(model.encoder.state_dict(),
                        weights_folder + model_str + "/encoder_" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
@@ -272,7 +287,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
             torch.save(model.state_dict(),
                        weights_folder + model_str + "/" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
 
-    if not autoencoder:
+    if autoencoder is None:
         # Compute scores on the local test set 
         img_test, gt_test = ds.get_test_set()
         preds = predict_test_set_nn(img_test, model)

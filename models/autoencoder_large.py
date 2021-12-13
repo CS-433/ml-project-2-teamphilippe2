@@ -29,11 +29,9 @@ class Encoder(nn.Module):
         self.conv7 = nn.Conv2d(512, 512, 3)
 
         # Fully Connected layer
-        self.fc = nn.Linear(512*4*4, 512)
+        self.fc = nn.Linear(512*4*4, 64)
 
     def forward(self, x):
-        print('encoder')
-        print(x.shape)
         x = relu(self.conv1(x))
         x = relu(self.conv2(x))
         x = relu(self.conv3(x))
@@ -44,10 +42,9 @@ class Encoder(nn.Module):
 
         # Flatten the feature maps into a vector
         # torch.Size([B, 512, 4, 4])
-        print(x.shape)
         x = x.view(-1, 512*4*4)
         #x = dropout(x, p=0.25, training=self.training)
-        print('encoder')
+
         return self.fc(x)
 
 
@@ -56,7 +53,7 @@ class Decoder(nn.Module):
         super().__init__()
 
         # First fully connected layer
-        self.fc = nn.Linear(512, 8192)
+        self.fc = nn.Linear(64, 8192)
 
         # First deconvolution
         self.first_deconv_channels = 512
@@ -81,10 +78,9 @@ class Decoder(nn.Module):
         self.deconv7 = nn.ConvTranspose2d(64, 3, 3, padding=1)
 
     def forward(self, x):
-        print('decoder')
         x = relu(self.fc(x))
         x = dropout(x, p=0.25, training=self.training)
-        print(x.shape)
+
         # Reshape into 512 feature maps,
         # keeping the batch size
         x = x.view(x.shape[0], self.first_deconv_channels, 4, 4)
@@ -96,8 +92,7 @@ class Decoder(nn.Module):
         x = relu(self.deconv5(x))
         x = relu(self.deconv6(x))
         x = self.deconv7(x)
-        print(x.shape)
-        print('decoder')
+
         return x
 
 
