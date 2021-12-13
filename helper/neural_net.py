@@ -7,6 +7,7 @@ from models.NNET import *
 from helper.data_augmentation import *
 from models.autoencoder import AutoEncoder
 from models.predictions import predict_test_set_nn
+from tqdm import tqdm
 
 
 def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True,
@@ -48,7 +49,7 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
     for epoch in range(num_epochs):
         # Train an epoch
         model.train()
-        for batch_x, batch_y in dataset_train:
+        for batch_x, batch_y in tqdm(dataset_train):
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
             # Evaluate the network (forward pass)
