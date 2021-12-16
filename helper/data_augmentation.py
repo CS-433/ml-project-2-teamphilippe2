@@ -108,7 +108,7 @@ class AugmentedRoadImages(Dataset):
         imgs = [img]
         gt_imgs = [gt]
 
-        # Generate 10 random crops
+        # Generate 30 random crops
         for i in range(30):
             # Get random crop params of size 200x200 
             i, j, h, w = RandomCrop.get_params(

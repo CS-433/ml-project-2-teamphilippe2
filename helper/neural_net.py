@@ -1,4 +1,5 @@
 import torch
+import torchgeometry
 from datetime import datetime
 from helper.metrics import *
 from models.UNet_orig import *
@@ -9,7 +10,7 @@ from models.predictions import predict_test_set_nn
 
 
 def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True,
-          autoencoder=False, scheduler=None):
+          autoencoder=False, scheduler=None, categorical=False):
     """
     Fully train a neural network
     Parameters:
@@ -46,13 +47,17 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
     for epoch in range(num_epochs):
         # Train an epoch
         model.train()
+        loss_sum=0
         for batch_x, batch_y in dataset_train:
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
             # Evaluate the network (forward pass)
             prediction = model(batch_x)
+            if categorical:
+                batch_y = batch_y.squeeze(dim=1).type(torch.int64)
+                
             loss = criterion(prediction, batch_y)
-            train_losses.append(loss.item())
+            loss_sum += loss.item()
 
             # Compute the gradient
             optimizer.zero_grad()
@@ -60,6 +65,7 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
 
             # Update the parameters of the model with a gradient step
             optimizer.step()
+        train_losses.append(loss_sum)
 
         # Test the quality on the test set
         # Disable dropout and batch-norm layers for instance
@@ -76,9 +82,9 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
                     prediction = model(batch_x)
 
                     t_loss = criterion(prediction,  batch_y).item()
-                    test_losses.append(t_loss)
                     test_losses_sum += t_loss
-
+                    
+                test_losses.append(test_losses_sum)
                 if print_iteration:
                     print(f"Epoch {epoch} | Avg test loss: {test_losses_sum / len(dataset_test):.5f}")
             else:
@@ -88,10 +94,15 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
 
                     # Evaluate the network (forward pass)
                     prediction = model(batch_x)
+                    
                     prediction[prediction >= 0.5] = 1
                     prediction[prediction < 0.5] = 0
                     
-                accuracies_test.append((batch_y.cpu().detach().numpy() == prediction.cpu().detach().numpy()).mean())
+                    if categorical:
+                        best_pred = prediction[:,1]>prediction[:,0]
+                        accuracies_test.append((batch_y.cpu().detach().numpy() == best_pred.cpu().detach().numpy()).mean())
+                    else:
+                        accuracies_test.append((batch_y.cpu().detach().numpy() == prediction.cpu().detach().numpy()).mean())
                 if print_iteration:
                     print("Epoch {} | Test accuracy: {:.5f}".format(epoch, sum(accuracies_test).item() / len(accuracies_test)))
                     
@@ -115,13 +126,20 @@ def loss_function_from_string(loss_fct_str):
         - The corresponding loss function
     """
     if loss_fct_str == "cross-entropy":
-        return torch.nn.CrossEntropyLoss()
+        return torch.nn.CrossEntropyLoss(), True
     elif loss_fct_str == "bce":
-        return torch.nn.BCELoss()
+        return torch.nn.BCELoss(), False
     elif loss_fct_str == "mse":
-        return torch.nn.MSELoss()
+        return torch.nn.MSELoss(), False
+    elif loss_fct_str == "bcelogit":
+        return torch.nn.BCEWithLogitsLoss(), False
+    elif loss_fct_str == "dice":
+        return torchgeometry.losses.DiceLoss(), True
+    elif loss_fct_str =="tversky":
+        return torchgeometry.losses.TverskyLoss(alpha=0.3, beta=0.7), True
     else:
-        return None
+        raise ValueError(f"Unexpected value {model_str}")
+
 
 
 def model_from_string(model_str):
@@ -136,13 +154,13 @@ def model_from_string(model_str):
         - The corresponding model
     """
     if model_str == "unet":
-        return UNet(3, 32)
+        return UNet(3, 64)
     elif model_str == "nnet":
         return NNet()
     elif model_str == "autoencoder":
         return AutoEncoder()
     else:
-        return None
+        raise ValueError(f"Unexpected value {model_str}")
 
 
 def optimizer_from_string(optimizer_str, params, lr, momentum):
@@ -169,7 +187,8 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
     elif optimizer_str == "lbfgs":
         return torch.optim.LBFGS(params, lr=lr)
     else:
-        return None
+        raise ValueError(f"Unexpected value {model_str}")
+
 
 
 def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3,
@@ -262,7 +281,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         print(f"Cuda memory for the model {torch.cuda.memory_allocated()}")
     
     # Create the asked loss
-    criterion = loss_function_from_string(loss_fct_str)
+    criterion, categorical = loss_function_from_string(loss_fct_str)
     
     # load the optimiser
     optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate, momentum)
@@ -272,7 +291,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
        # Use a step lr scheduler
        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_schedule[0], gamma=lr_schedule[1])
 
-    train_losses, test_losses, accuracies_test = train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, autoencoder=autoencoder, scheduler=scheduler, print_iteration=verbose)
+    train_losses, test_losses, accuracies_test = train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, autoencoder=autoencoder, scheduler=scheduler, print_iteration=verbose, categorical=categorical)
 
     if save_weights:
         now = datetime.now()

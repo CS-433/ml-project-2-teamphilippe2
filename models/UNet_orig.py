@@ -87,8 +87,8 @@ class UNet(nn.Module):
         # - A 1D convolution with 1 output channel corresponding to the probability of patch being Road 
         # - A sigmoid activation function
         self.fc9 = nn.Sequential(
-            nn.Conv2d(in_channels=out_c, out_channels=1, kernel_size=1),
-            nn.Sigmoid()
+            nn.Conv2d(in_channels=out_c, out_channels=1, kernel_size=1)#,
+            #nn.Sigmoid()
         )
 
     def forward(self, x):

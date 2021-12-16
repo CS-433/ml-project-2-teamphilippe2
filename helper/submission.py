@@ -1,6 +1,6 @@
 import numpy as np
 
-foreground_threshold = 0.25  # percentage of pixels > 1 required to assign a foreground label to a patch
+foreground_threshold = 0.35  # percentage of pixels > 1 required to assign a foreground label to a patch
 
 
 # assign a label to a patch
