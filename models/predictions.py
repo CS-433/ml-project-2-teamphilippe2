@@ -31,10 +31,16 @@ def pred_single_img_nnet(nn_model, img, device, threshold):
     dev_img = img.unsqueeze(0).to(device)
     pred = nn_model(dev_img).detach().cpu().numpy()
     
-    pred[pred<=0.5]=0
-    pred[pred>0.5]=1
-    
-    return pred
+    if pred.shape[1]>1 :
+        res = np.expand_dims(pred[:,0,:,:] >= pred[:,1,:,:], axis = 0)
+    else :
+        pred[pred<=0.5]=0
+        pred[pred>0.5]=1
+        res = pred
+
+    #print(res.shape)
+    #print(res)
+    return res
 
 def predict_test_set_nn(img_tests, nn_model, threshold = 0.5):
     """
