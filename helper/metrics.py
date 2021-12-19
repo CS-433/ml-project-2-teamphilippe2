@@ -1,4 +1,5 @@
 from sklearn.metrics import f1_score, recall_score, precision_score, accuracy_score
+import numpy as np
 
 
 def compute_scores(y_true, y_pred):
@@ -20,10 +21,14 @@ def compute_scores(y_true, y_pred):
         -------
             F1 score, Recall, Precision, Accuracy
     """
+    y_true = np.array([y_t.flatten() for y_t in y_true], dtype=np.intc).flatten()
+    y_pred =  np.array([y_p.flatten() for y_p in y_pred], dtype=np.intc).flatten()
+    
     f1 = f1_score(y_true, y_pred)
     recall = recall_score(y_true, y_pred)
     precision = precision_score(y_true, y_pred)
     accuracy = accuracy_score(y_true, y_pred)
+
     print("Performance on the local test set")
     print(f'\tF1-score : {f1:.4f}')
     print(f'\tRecall : {recall:.4f}')

@@ -1,6 +1,6 @@
 import numpy as np
 
-foreground_threshold = 0.25  # percentage of pixels > 1 required to assign a foreground label to a patch
+foreground_threshold = 0.35  # percentage of pixels > 1 required to assign a foreground label to a patch
 
 
 # assign a label to a patch
@@ -48,7 +48,7 @@ def pred_to_submission_strings(img_id, img, patch_size):
             for i in range(0, img_np.shape[0], patch_size):
                 patch = img_np[i:i + patch_size, j:j + patch_size]
                 label = patch_to_label(patch)
-                yield img_id + "_{}_{},{}".format(j, i, label)
+                yield("{:03d}_{}_{},{}".format(img_id, j, i, label))
 
 
 def predictions_to_submission(submission_filename, ids, predictions, patch_size=16):
