@@ -2,6 +2,7 @@ import torch
 from datetime import datetime
 from helper.metrics import *
 from helper.const import *
+from models.ConvNet import ConvNet
 from models.UNet import *
 from models.NNET import *
 from helper.data_augmentation import *
@@ -44,7 +45,7 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
     """
     test_losses = []
     train_losses = []
-    
+
     print("Starting training")
     for epoch in range(num_epochs):
         # Train an epoch
@@ -78,7 +79,7 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
 
                     prediction = model(batch_x)
 
-                    t_loss = criterion(prediction,  batch_y).item()
+                    t_loss = criterion(prediction, batch_y).item()
                     test_losses.append(t_loss)
                     test_losses_sum += t_loss
 
@@ -97,12 +98,13 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
 
                     accuracies_test.append((batch_y.detach().numpy() == prediction.detach().numpy()).mean())
                 if print_iteration:
-                    print("Epoch {} | Test accuracy: {:.5f}".format(epoch, sum(accuracies_test).item() / len(accuracies_test)))
-                    
+                    print("Epoch {} | Test accuracy: {:.5f}".format(epoch,
+                                                                    sum(accuracies_test).item() / len(accuracies_test)))
+
         # Update the lr scheduler
         if scheduler is not None:
             scheduler.step()
-    
+
     print("End of training")
     return model, train_losses, test_losses
 
@@ -145,6 +147,8 @@ def model_from_string(model_str):
         return NNet()
     elif model_str == "autoencoder":
         return AutoEncoder()
+    elif model_str == "convnet":
+        return ConvNet()
     else:
         return None
 
@@ -175,8 +179,8 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
 
 
 def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3,
-                   momentum=0.0, batch_size=16, save_weights=True, ratio_test=0.2, seed=1, autoencoder=None,
-                  lr_scheduler=False, lr_schedule=(10, 0.1), test_dir=''):
+                   momentum=0.0, batch_size=16, save_weights=True, ratio_test=0.2, seed=1, im_patch=None,
+                   lr_scheduler=False, lr_schedule=(10, 0.1), test_dir=''):
     """
     Fully train the asked neural network, save the weights and test the accuracy on the test set. 
     Parameters:
@@ -220,30 +224,35 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         - Train losses
         - Test losses
     """
-    if autoencoder == 'patches':
+    if im_patch == 'patches':
+        # Do not use supervision for autoencoder
         # Training dataset
-        ds = OriginalTrainingRoadPatches(image_dir)
+        ds = AutoencoderTrainingRoadPatches(image_dir)
         dataset_train = torch.utils.data.DataLoader(ds,
                                                     batch_size=batch_size,
                                                     shuffle=True
                                                     )
 
-        # Test set on true "test" (used for AICrowd) set
-        # as autoencoder is unsupervised
-        dstest = OriginalTestRoadPatches(gt_dir)
+        # For autoencoder, test set on true "test" (used for AICrowd) set
+        # as it is unsupervised
+        dstest = AutoencoderTestRoadPatches(gt_dir)
         dataset_test = torch.utils.data.DataLoader(dstest,
                                                    batch_size=batch_size,
                                                    shuffle=True)
-    elif autoencoder == 'images':
-        # Use all original training data for training and test on the
-        # AICrowd test set
-        ds = AugmentedRoadImages(image_dir, gt_dir, 1.0, seed, autoencoder=True)
+
+    elif im_patch == 'patches_sup':
+        # Use supervision
+        ds = ConvNetTrainingRoadPatches(image_dir, gt_dir)
         dataset_train = torch.utils.data.DataLoader(ds,
                                                     batch_size=batch_size,
                                                     shuffle=True
                                                     )
-        dstest = OriginalTestRoadImages(test_dir)
-        dataset_test = torch.utils.data.DataLoader(dstest, batch_size=batch_size, shuffle=True)
+
+        dstest = ConvNetTestRoadPatches(ds)
+        dataset_test = torch.utils.data.DataLoader(dstest,
+                                                   batch_size=batch_size,
+                                                   shuffle=True)
+
     else:
         ds = AugmentedRoadImages(image_dir, gt_dir, ratio_test, seed)
         dataset_train = torch.utils.data.DataLoader(ds,
@@ -264,21 +273,21 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
     criterion = loss_function_from_string(loss_fct_str)
     model = model_from_string(model_str).to(device)
     optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate, momentum)
-    
+
     scheduler = None
     if lr_scheduler:
-       # Use a step lr scheduler
-       scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_schedule[0], gamma=lr_schedule[1])
+        # Use a step lr scheduler
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_schedule[0], gamma=lr_schedule[1])
 
     _, train_losses, test_losses = train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs,
-                                         autoencoder=autoencoder, scheduler=scheduler)
+                                         autoencoder=im_patch, scheduler=scheduler)
 
     if save_weights:
         now = datetime.now()
 
         # If we used an autoencoder,
         # separate the weights files
-        if autoencoder is not None:
+        if im_patch is not None:
             # Save encoder weights
             torch.save(model.encoder.state_dict(),
                        weights_folder + model_str + "/encoder_" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
@@ -290,14 +299,14 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
             torch.save(model.state_dict(),
                        weights_folder + model_str + "/" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
 
-    if autoencoder is None:
+    if im_patch is None:
         # Compute scores on the local test set 
         img_test, gt_test = ds.get_test_set()
         preds = predict_test_set_nn(img_test, model)
 
         # Display scores
         _, _, _, _ = compute_scores(preds, gt_test)
-    
+
     return train_losses, test_losses
 
 
