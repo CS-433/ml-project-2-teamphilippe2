@@ -1,16 +1,13 @@
-import torch
-import torchgeometry
 from datetime import datetime
+import torchgeometry
+from helper.data_augmentation import *
 from helper.metrics import *
-from helper.const import *
 from models.ConvNet import ConvNet
+from models.NNET import *
 from models.UNet import *
 from models.UNet_orig import *
-from models.NNET import *
-from helper.data_augmentation import *
 from models.autoencoder import AutoEncoder
 from models.predictions import predict_test_set_nn
-from tqdm import tqdm
 
 
 def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True,
@@ -53,7 +50,7 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
     for epoch in range(num_epochs):
         # Train an epoch
         model.train()
-        loss_sum=0
+        loss_sum = 0
         for batch_x, batch_y in dataset_train:
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
@@ -61,7 +58,7 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
             prediction = model(batch_x)
             if categorical:
                 batch_y = batch_y.squeeze(dim=1).type(torch.int64)
-                
+
             loss = criterion(prediction, batch_y)
             loss_sum += loss.item()
 
@@ -91,7 +88,7 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
                     test_losses.append(t_loss)
 
                     test_losses_sum += t_loss
-                    
+
                 test_losses.append(test_losses_sum)
                 if print_iteration:
                     print(f"Epoch {epoch} | Avg test loss: {test_losses_sum / len(dataset_test):.5f}")
@@ -102,15 +99,17 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
 
                     # Evaluate the network (forward pass)
                     prediction = model(batch_x)
-                    
+
                     prediction[prediction >= 0.5] = 1
                     prediction[prediction < 0.5] = 0
-                    
+
                     if categorical:
-                        best_pred = prediction[:,1]>prediction[:,0]
-                        accuracies_test.append((batch_y.cpu().detach().numpy() == best_pred.cpu().detach().numpy()).mean())
+                        best_pred = prediction[:, 1] > prediction[:, 0]
+                        accuracies_test.append(
+                            (batch_y.cpu().detach().numpy() == best_pred.cpu().detach().numpy()).mean())
                     else:
-                        accuracies_test.append((batch_y.cpu().detach().numpy() == prediction.cpu().detach().numpy()).mean())
+                        accuracies_test.append(
+                            (batch_y.cpu().detach().numpy() == prediction.cpu().detach().numpy()).mean())
                 if print_iteration:
                     print("Epoch {} | Test accuracy: {:.5f}".format(epoch,
                                                                     sum(accuracies_test).item() / len(accuracies_test)))
@@ -123,13 +122,15 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
     return train_losses, test_losses, accuracies_test
 
 
-def loss_function_from_string(loss_fct_str):
+def loss_function_from_string(loss_fct_str, pos_weight=None):
     """
     Return the loss function corresponding to the given string
     Parameters: 
     -----------
         - loss_fct_str: 
             The name of the loss function we want to get
+        - pos_weight:
+            Array of weights for the different classes in the loss
     Returns: 
     -----------
         - The corresponding loss function
@@ -141,14 +142,16 @@ def loss_function_from_string(loss_fct_str):
     elif loss_fct_str == "mse":
         return torch.nn.MSELoss(), False
     elif loss_fct_str == "bcelogit":
-        return torch.nn.BCEWithLogitsLoss(), False
+        if pos_weight is not None:
+            return torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight), False
+        else:
+            return torch.nn.BCEWithLogitsLoss(), False
     elif loss_fct_str == "dice":
         return torchgeometry.losses.DiceLoss(), True
-    elif loss_fct_str =="tversky":
+    elif loss_fct_str == "tversky":
         return torchgeometry.losses.TverskyLoss(alpha=0.3, beta=0.7), True
     else:
-        raise ValueError(f"Unexpected value {model_str}")
-
+        raise ValueError(f"Unexpected value {loss_fct_str}")
 
 
 def model_from_string(model_str):
@@ -198,13 +201,12 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
     elif optimizer_str == "lbfgs":
         return torch.optim.LBFGS(params, lr=lr)
     else:
-        raise ValueError(f"Unexpected value {model_str}")
-
+        raise ValueError(f"Unexpected value {optimizer_str}")
 
 
 def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3,
                    momentum=0.0, batch_size=16, save_weights=True, ratio_train=0.8, seed=1, im_patch=None,
-                   lr_scheduler=False, lr_schedule=(10, 0.1), test_dir='', verbose=True):
+                   lr_scheduler=False, lr_schedule=(10, 0.1), verbose=True, pos_weight=None):
     """
     Fully train the asked neural network, save the weights and test the accuracy on the test set. 
     Parameters:
@@ -241,10 +243,10 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
             Boolean indicating whether to use a learning rate scheduler
         - lr_schedule:
             Tuple (epochs step, division factor) for the learning rate scheduler
-        - test_dir :
-             the folder containing all the test (AICrowd) images
         - verbose:
             Boolean indicating whether to print the loss in each epoch
+        - pos_weight:
+            Array of weights for the different classes in the loss
     Returns: 
     -----------
         - Train losses
@@ -286,11 +288,10 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         dataset_train = torch.utils.data.DataLoader(ds,
                                                     batch_size=batch_size,
                                                     shuffle=True
-                                                 )
+                                                    )
         # Test set on true "test" (used for AICrowd) set
         dstest = RoadTestImages(ds)
         dataset_test = torch.utils.data.DataLoader(dstest, batch_size=batch_size, shuffle=True)
-
 
     # Try to move the model to the GPU or the CPU
     device = torch.device("cuda")
@@ -300,17 +301,16 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         print("Things will go much quicker with a GPU")
         device = torch.device("cpu")
 
-
     # Create the model
     model = model_from_string(model_str).to(device)
 
     print(f"Number of parameters in the model {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
     if torch.cuda.is_available():
         print(f"Cuda memory for the model {torch.cuda.memory_allocated()}")
-    
+
     # Create the asked loss
-    criterion, categorical = loss_function_from_string(loss_fct_str)
-    
+    criterion, categorical = loss_function_from_string(loss_fct_str, pos_weight=pos_weight)
+
     # load the optimiser
     optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate, momentum)
 
@@ -349,9 +349,8 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
 
         # Display scores
         _, _, _, _ = compute_scores(gt_test, preds)
-    
-    return train_losses, test_losses, accuracies_test
 
+    return train_losses, test_losses, accuracies_test
 
 
 def load_model_weights(model, weights_path):
