@@ -25,12 +25,10 @@ class ConvNet(nn.Module):
         )
 
     def forward(self, x):
-        print(x.shape)
         x = self.convs(x)
 
         # Flatten the feature maps into a vector
         # torch.Size([B, 512, 6, 6])
-        print(x.shape)
         x = x.view(-1, 512*6*6)
         x = dropout(x, p=0.5, training=self.training)
-        return sigmoid(self.fc(x))
+        return self.fc(x)

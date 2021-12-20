@@ -1,5 +1,5 @@
 from datetime import datetime
-from helper.data_augmentation import *
+from helper.datasets_image import *
 from helper.metrics import *
 from models.ConvNet import ConvNet
 from models.NNET import *
@@ -7,11 +7,11 @@ from models.UNet import *
 from models.UNet_orig import *
 from models.autoencoder import AutoEncoder
 from models.predictions import predict_test_set_nn
+from tqdm import tqdm
 
 
-def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True, 
-          autoencoder=False,im_patch=None, scheduler=None, categorical=False, threshold=0.5):
-
+def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True,
+          im_patch=None, scheduler=None, categorical=False, threshold=0.5):
     """
     Fully train a neural network
     Parameters:
@@ -51,7 +51,7 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
         # Train an epoch
         model.train()
         loss_sum = 0
-        for batch_x, batch_y in dataset_train:
+        for batch_x, batch_y in tqdm(dataset_train):
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
             # Evaluate the network (forward pass)
@@ -59,8 +59,6 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
             if categorical:
                 batch_y = batch_y.squeeze(dim=1).type(torch.int64)
 
-            print(prediction.dtype)
-            print(batch_y.dtype)
             loss = criterion(prediction, batch_y)
             loss_sum += loss.item()
 
@@ -79,7 +77,7 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
         # Disable gradients computation
         with torch.no_grad():
             # Evaluate the loss on the test set for the autoencoder
-            if im_patch is not None:
+            if im_patch == 'patches':
                 test_losses_sum = 0
                 for batch_x, batch_y in dataset_test:
                     batch_x, batch_y = batch_x.to(device), batch_y.to(device)
@@ -100,10 +98,10 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
 
                     # Evaluate the network (forward pass)
                     prediction = model(batch_x)
-                    
+
                     prediction[prediction >= threshold] = 1
                     prediction[prediction < threshold] = 0
-                    
+
                     if categorical:
                         best_pred = prediction[:, 1] > prediction[:, 0]
                         accuracies_test.append(
@@ -207,7 +205,7 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
 
 def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3,
                    momentum=0.0, batch_size=16, save_weights=True, ratio_train=0.8, seed=1, im_patch=None,
-                   lr_scheduler=False, lr_schedule=(10, 0.1), verbose=True, pos_weight=None):
+                   lr_scheduler=False, lr_schedule=(10, 0.1), verbose=True, pos_weight=False):
     """
     Fully train the asked neural network, save the weights and test the accuracy on the test set. 
     Parameters:
@@ -247,7 +245,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         - verbose:
             Boolean indicating whether to print the loss in each epoch
         - pos_weight:
-            Array of weights for the different classes in the loss
+            Whether to use pos_weight or not
     Returns: 
     -----------
         - Train losses
@@ -302,8 +300,10 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         print("Things will go much quicker with a GPU")
         device = torch.device("cpu")
 
-    if pos_weight is not None:
-        pos_weight = pos_weight.to(device)
+    pos_weight_tensor = None
+    if pos_weight:
+        pos_weight_tensor = ds.compute_pos_weights()
+        pos_weight_tensor = pos_weight_tensor.to(device)
 
     # Create the model
     model = model_from_string(model_str).to(device)
@@ -313,27 +313,29 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         print(f"Cuda memory for the model {torch.cuda.memory_allocated()}")
 
     # Create the asked loss
-    criterion, categorical = loss_function_from_string(loss_fct_str, pos_weight=pos_weight)
+    criterion, categorical = loss_function_from_string(loss_fct_str, pos_weight=pos_weight_tensor)
 
     # load the optimiser
     optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate, momentum)
 
     scheduler = None
     if lr_scheduler:
-       # Use a step lr scheduler
-       scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_schedule[0], gamma=lr_schedule[1])
-    
-    threshold = 0.0 if loss_function_from_string == "beclogit" else 0.5
-    
-    train_losses, test_losses, accuracies_test = train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, autoencoder=autoencoder, scheduler=scheduler, print_iteration=verbose, categorical=categorical, threshold = threshold)
+        # Use a step lr scheduler
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_schedule[0], gamma=lr_schedule[1])
 
+    threshold = 0.0 if loss_function_from_string == "bcelogit" else 0.5
+
+    train_losses, test_losses, accuracies_test = train(model, criterion, dataset_train, dataset_test, device, optimizer,
+                                                       num_epochs, im_patch=im_patch, scheduler=scheduler,
+                                                       print_iteration=verbose, categorical=categorical,
+                                                       threshold=threshold)
 
     if save_weights:
         now = datetime.now()
 
         # If we used an autoencoder,
         # separate the weights files
-        if im_patch is not None:
+        if im_patch == 'patches':
             # Save encoder weights
             torch.save(model.encoder.state_dict(),
                        weights_folder + model_str + "/encoder_" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
@@ -345,14 +347,14 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
             torch.save(model.state_dict(),
                        weights_folder + model_str + "/" + now.strftime("%Y-%m-%d_%H-%M-%S") + ext_weight_model)
 
-    if im_patch is None:
+    if im_patch != 'patches':
         # Compute scores on the local test set 
         img_test, gt_test = ds.get_test_set()
-        
+
         gt_test = [gt.numpy() for gt in gt_test]
 
         preds = predict_test_set_nn(img_test, model, threshold=threshold)
-            
+
         # Display scores
         _, _, _, _ = compute_scores(gt_test, preds)
 
