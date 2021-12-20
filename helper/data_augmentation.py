@@ -34,7 +34,7 @@ class AugmentedRoadImages(Dataset):
     Custom class to load our training dataset
     """
 
-    def __init__(self, img_datapath, gt_datapath, ratio_test, seed, autoencoder=False):
+    def __init__(self, img_datapath, gt_datapath, ratio_train, seed, autoencoder=False):
         """
         Load and split the dataset
         
@@ -112,7 +112,7 @@ class AugmentedRoadImages(Dataset):
         gt_imgs = [gt]
 
         # Generate 30 random crops
-        for i in range(30):
+        for i in range(10):
             # Get random crop params of size 200x200 
             i, j, h, w = RandomCrop.get_params(
                 img, output_size=(img.shape[1] // 2, img.shape[2] // 2))
@@ -126,6 +126,14 @@ class AugmentedRoadImages(Dataset):
         for angle in rotation_angles:
             imgs.append(rotate(img, angle))
             gt_imgs.append(rotate(gt, angle))
+            
+        # generate cropped rotation of the same image
+        rotation_angles = [15, 45, 60, 105, 120, 165, 195, 210, 240, 255, 300, 315]
+        crop_center = CenterCrop(200)
+        resize = Resize([400,400])
+        for angle in rotation_angles:
+            imgs.append(resize(crop_center(rotate(img, angle))))
+            gt_imgs.append(resize(crop_center(rotate(gt, angle))))
 
         # Only select the first dimension to transform back the ground truth to a 2D image
         gt_imgs2 = []
@@ -135,8 +143,17 @@ class AugmentedRoadImages(Dataset):
             gt_imgs2.append(gt[None, :, :])
 
         return imgs, gt_imgs2
-
-
+    def compute_pos_weight(self):
+        cur_sum = 0
+        
+        for gt in self.gt_imgs:
+            cur_sum += gt.sum()
+            width, height = gt.shape[1], gt.shape[2]
+            
+        total_size = width*height*len(self.gt_imgs)-cur_sum
+        
+        return total_size/cur_sum
+        
 class AutoencoderTrainingRoadPatches(Dataset):
     """
     Original, non augmented training patches.

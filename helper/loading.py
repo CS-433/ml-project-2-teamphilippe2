@@ -3,11 +3,8 @@ import os
 import numpy as np
 import torch
 from torchvision.transforms.functional import resize
-
 from helper.const import *
 
-
-# Helper functions
 def load_image(image_file):
     """
     Load one image from the image file
@@ -202,3 +199,17 @@ def load_numpy(file):
     with open(file, 'rb') as f:
         X = np.load(f)
     return X
+
+
+def load_model_weights(model, weights_path):
+    """
+    Loads the weights from the given file
+    Parameters:
+    -----------
+        - model:
+            Model of the network
+        - weights_path:
+            Path of the file
+    -----------
+    """
+    model.load_state_dict(torch.load(weights_path))

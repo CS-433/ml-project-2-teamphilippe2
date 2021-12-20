@@ -23,69 +23,71 @@ class UNet(nn.Module):
         self.nber_channels = nber_channels
         self.nber_filters = nber_filters
 
-        channel_multiplier = 2
-
         # Define the encoder layers
         # Layer 1
-        self.fc1 = DownSample(nber_channels, nber_filters)
+        in_c = nber_channels
+        out_c = nber_filters
+        self.fc1 = DownSample(in_c, out_c)
 
         # Layer 2
-        self.fc2 = DownSample(nber_filters, nber_filters * channel_multiplier)
+        in_c = out_c
+        out_c = out_c * 2
+        self.fc2 = DownSample(in_c, out_c)
 
         # Layer 3
-        self.fc3 = DownSample(nber_filters * channel_multiplier, nber_filters * (channel_multiplier ** 2))
-
-        # Layer 4
-        # in_c = out_c
-        # out_c =out_c*2
-        # self.fc4 = DownSample(in_c, out_c)
+        in_c = out_c
+        out_c = out_c * 2
+        self.fc3 = DownSample(in_c, out_c)
 
         # Define the middle of network composed of 
         # - a last step of down sampling without pooling
         # - a first layer of deconvolution
 
         # Middle down Layer
+        in_c = out_c
+        out_c = out_c*2
         self.layer_middle_down = nn.Sequential(
             # BN
-            nn.BatchNorm2d(nber_filters * (channel_multiplier ** 2)),
+            nn.BatchNorm2d(in_c),
             # relu
             nn.ReLU(inplace=True),
             # conv
-            nn.Conv2d(in_channels=nber_filters * (channel_multiplier ** 2),
-                      out_channels=nber_filters * (channel_multiplier ** 3), kernel_size=3, padding=1),
+            nn.Conv2d(in_channels=in_c, out_channels=out_c, kernel_size=3, padding=1),
             # BN
-            nn.BatchNorm2d(nber_filters * (channel_multiplier ** 3)),
+            nn.BatchNorm2d(out_c),
             # relu
             nn.ReLU(inplace=True),
             # conv
-            nn.Conv2d(in_channels=nber_filters * (channel_multiplier ** 3),
-                      out_channels=nber_filters * (channel_multiplier ** 3), kernel_size=3, padding=1)
+            nn.Conv2d(in_channels=out_c, out_channels=out_c, kernel_size=3, padding=1)
         )
 
         # Middle Up Layer
         # Inversion of the values of the input channels and the output channels
-        self.layer_middle_up = nn.ConvTranspose2d(nber_filters * (channel_multiplier ** 3),
-                                                  nber_filters * (channel_multiplier ** 2), kernel_size=3,
-                                                  stride=(2, 2), output_padding=1, padding=1)
-
-        # Define the decoder layers
-        # Layer 5
-        # self.fc5 = UpSample(in_c, out_c)
+        temp = out_c
+        out_c = in_c
+        in_c = temp
+        self.layer_middle_up = nn.ConvTranspose2d(in_c, out_c, kernel_size=3, stride=(2, 2), output_padding=1, padding=1)
 
         # Layer 6
-        self.fc6 = UpSample(nber_filters * (channel_multiplier ** 3), nber_filters * (channel_multiplier ** 2))
+        #in_c = out_c
+        #out_c = out_c//2
+        self.fc6 = UpSample(in_c, out_c)
 
         # Layer 7
-        self.fc7 = UpSample(nber_filters * (channel_multiplier ** 2), nber_filters * channel_multiplier)
+        in_c = out_c
+        out_c = out_c // 2
+        self.fc7 = UpSample(in_c, out_c)
 
         # Layer 8
-        self.fc8 = UpSample(nber_filters * channel_multiplier, nber_filters)
+        #in_c = out_c
+        #out_c = out_c // 2
+        #self.fc8 = UpSample(in_c, out_c)
 
         # The final layer is composed of 
         # - A 1D convolution with 1 output channel corresponding to the probability of patch being Road 
         # - A sigmoid activation function
         self.fc9 = nn.Sequential(
-            nn.Conv2d(in_channels=nber_filters, out_channels=1, kernel_size=1),
+            nn.Conv2d(in_channels=out_c, out_channels=2, kernel_size=1),
             nn.Sigmoid()
         )
 
@@ -108,20 +110,22 @@ class UNet(nn.Module):
         conv1, pool1 = self.fc1(x)
         conv2, pool2 = self.fc2(pool1)
         conv3, pool3 = self.fc3(pool2)
-
+        
         # Middle of the network
-        middle_down = self.layer_middle_down(pool3)
+        middle_down = self.layer_middle_down(pool3)#, self.pool(self.layer_middle_down(pool3))
+        
         middle_up = self.layer_middle_up(middle_down)
-
+        
         # Decoder Part
         concat2 = torch.cat((conv3, middle_up), 1)
         deconv2 = self.fc6(concat2)
         concat3 = torch.cat((conv2, deconv2), 1)
         deconv3 = self.fc7(concat3)
         concat4 = torch.cat((conv1, deconv3), 1)
-        deconv4 = self.fc8(concat4)
+        #deconv4 = self.fc8(concat4)
+        #print(f"deconv 4 : {deconv4.shape}")
 
-        output = self.fc9(deconv4)
+        output = self.fc9(concat4)
         return output
 
 
@@ -209,7 +213,6 @@ class UpSample(nn.Module):
             Number of output filters for the first layer of the net
 
         """
-
         super().__init__()
 
         self.nber_channels = nber_channels
