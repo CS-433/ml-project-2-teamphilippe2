@@ -10,7 +10,7 @@ from models.predictions import predict_test_set_nn
 
 
 def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iteration=True,
-          autoencoder=False, scheduler=None, categorical=False):
+          autoencoder=False, scheduler=None, categorical=False, threshold=0.5):
     """
     Fully train a neural network
     Parameters:
@@ -95,8 +95,8 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
                     # Evaluate the network (forward pass)
                     prediction = model(batch_x)
                     
-                    prediction[prediction >= 0.5] = 1
-                    prediction[prediction < 0.5] = 0
+                    prediction[prediction >= threshold] = 1
+                    prediction[prediction < threshold] = 0
                     
                     if categorical:
                         best_pred = prediction[:,1]>prediction[:,0]
@@ -290,8 +290,10 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
     if lr_scheduler:
        # Use a step lr scheduler
        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_schedule[0], gamma=lr_schedule[1])
-
-    train_losses, test_losses, accuracies_test = train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, autoencoder=autoencoder, scheduler=scheduler, print_iteration=verbose, categorical=categorical)
+    
+    threshold = 0.0 if loss_function_from_string == "beclogit" else 0.5
+    
+    train_losses, test_losses, accuracies_test = train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, autoencoder=autoencoder, scheduler=scheduler, print_iteration=verbose, categorical=categorical, threshold = threshold)
 
     if save_weights:
         now = datetime.now()
@@ -313,9 +315,11 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
     if not autoencoder:
         # Compute scores on the local test set 
         img_test, gt_test = ds.get_test_set()
+        
         gt_test = [gt.numpy() for gt in gt_test]
-        preds = predict_test_set_nn(img_test, model)
 
+        preds = predict_test_set_nn(img_test, model, threshold=threshold)
+            
         # Display scores
         _, _, _, _ = compute_scores(gt_test, preds)
     
