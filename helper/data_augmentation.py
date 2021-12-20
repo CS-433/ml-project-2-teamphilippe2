@@ -193,7 +193,7 @@ class ConvNetTrainingRoadPatches(Dataset):
     """
     Original, non augmented training patches.
     """
-    def __init__(self, image_dir, gt_dir, patch_size=16, seed=0):
+    def __init__(self, image_dir, gt_dir, patch_size=16, seed=0, ratio_train=0.8):
         # Load all training images and gt in folder
         imgs, gt_imgs = load_images_and_groundtruth(image_dir, gt_dir)
 
@@ -205,11 +205,15 @@ class ConvNetTrainingRoadPatches(Dataset):
         y = build_gt_from_patches(gt_patches,
                                   lambda gt_patch: value_to_class(gt_patch, threshold=0.5))
 
-        # Convert to correct Tensor format
-        patches = to_tensor_and_permute(patches)
-
         # Split data into training and validation set
-        self.patches_train, self.y_train, self.patches_test, self.y_test = split_data(patches, y, 0.8, seed=seed)
+        self.patches_train, self.y_train, self.patches_test, self.y_test = split_data(patches, y, ratio_train, seed=seed)
+
+        # Convert to correct Tensor format
+        self.patches_train = to_tensor_and_permute(self.patches_train)
+        self.patches_test = to_tensor_and_permute(self.patches_test)
+
+        self.y_train = torch.unsqueeze(torch.from_numpy(self.y_train), 1)
+        self.y_test = torch.unsqueeze(torch.from_numpy(self.y_test), 1)
 
         self.n_samples = len(self.patches_train)
 

@@ -1,5 +1,4 @@
 from datetime import datetime
-import torchgeometry
 from helper.data_augmentation import *
 from helper.metrics import *
 from models.ConvNet import ConvNet
@@ -59,6 +58,8 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
             if categorical:
                 batch_y = batch_y.squeeze(dim=1).type(torch.int64)
 
+            print(prediction.dtype)
+            print(batch_y.dtype)
             loss = criterion(prediction, batch_y)
             loss_sum += loss.item()
 
@@ -77,13 +78,12 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
         # Disable gradients computation
         with torch.no_grad():
             # Evaluate the loss on the test set for the autoencoder
-            if autoencoder is not None:
+            if im_patch is not None:
                 test_losses_sum = 0
                 for batch_x, batch_y in dataset_test:
                     batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
                     prediction = model(batch_x)
-
                     t_loss = criterion(prediction, batch_y).item()
                     test_losses.append(t_loss)
 
@@ -235,7 +235,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
             The train-test set split ratio
         - seed:
             The seed to use during splitting
-        - autoencoder:
+        - im_patch:
             String indicating whether we are training an autoencoder,
             and if we use patches or complete images as input. None
             if we do not train an autoencoder.
@@ -271,7 +271,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
 
     elif im_patch == 'patches_sup':
         # Use supervision
-        ds = ConvNetTrainingRoadPatches(image_dir, gt_dir)
+        ds = ConvNetTrainingRoadPatches(image_dir, gt_dir, ratio_train=ratio_train)
         dataset_train = torch.utils.data.DataLoader(ds,
                                                     batch_size=batch_size,
                                                     shuffle=True
@@ -301,6 +301,9 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         print("Things will go much quicker with a GPU")
         device = torch.device("cpu")
 
+    if pos_weight is not None:
+        pos_weight = pos_weight.to(device)
+
     # Create the model
     model = model_from_string(model_str).to(device)
 
@@ -320,7 +323,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_schedule[0], gamma=lr_schedule[1])
 
     train_losses, test_losses, accuracies_test = train(model, criterion, dataset_train, dataset_test, device,
-                                                       optimizer, num_epochs, im_patch=autoencoder,
+                                                       optimizer, num_epochs, im_patch=im_patch,
                                                        scheduler=scheduler, print_iteration=verbose,
                                                        categorical=categorical)
 
