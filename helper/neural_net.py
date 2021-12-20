@@ -1,7 +1,9 @@
 from datetime import datetime
-from helper.datasets_image import *
+
+from helper.const import weights_folder, ext_weight_model
+from helper.datasets_image import AugmentedRoadImages, RoadTestImages
+from helper.datasets_patch import AutoencoderTestRoadPatches, AutoencoderTrainingRoadPatches
 from helper.metrics import *
-from models.ConvNet import ConvNet
 from models.NNET import *
 from models.UNet import *
 from models.UNet_orig import *
@@ -170,13 +172,11 @@ def model_from_string(model_str):
         return NNet()
     elif model_str == "autoencoder":
         return AutoEncoder()
-    elif model_str == "convnet":
-        return ConvNet()
     else:
         raise ValueError(f"Unexpected value {model_str}")
 
 
-def optimizer_from_string(optimizer_str, params, lr, momentum):
+def optimizer_from_string(optimizer_str, params, lr, momentum, weight_decay=1e-4):
     """
     Return the optimiser corresponding to the given string
     Parameters: 
@@ -189,12 +189,14 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
             The learning rate we want to apply during training
         - momentum: 
             The momentum we want to include in the optimiser
+        - weight_decay:
+            L2 regularizer coefficient
     Returns: 
     -----------
         - The corresponding optimiser
     """
     if optimizer_str == "adam":
-        return torch.optim.Adam(params, lr=lr)
+        return torch.optim.Adam(params, lr=lr, weight_decay=weight_decay)
     elif optimizer_str == "sgd":
         return torch.optim.SGD(params, lr=lr, momentum=momentum)
     elif optimizer_str == "lbfgs":
@@ -205,7 +207,7 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
 
 def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3,
                    momentum=0.0, batch_size=16, save_weights=True, ratio_train=0.8, seed=1, im_patch=None,
-                   lr_scheduler=False, lr_schedule=(10, 0.1), verbose=True, pos_weight=False):
+                   lr_scheduler=False, lr_schedule=(10, 0.1), verbose=True, pos_weight=False, weight_decay=1e-4):
     """
     Fully train the asked neural network, save the weights and test the accuracy on the test set. 
     Parameters:
@@ -246,6 +248,8 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
             Boolean indicating whether to print the loss in each epoch
         - pos_weight:
             Whether to use pos_weight or not
+        - weight_decay:
+            L2 regularizer coefficient
     Returns: 
     -----------
         - Train losses
@@ -264,19 +268,6 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         # For autoencoder, test set on true "test" (used for AICrowd) set
         # as it is unsupervised
         dstest = AutoencoderTestRoadPatches(gt_dir)
-        dataset_test = torch.utils.data.DataLoader(dstest,
-                                                   batch_size=batch_size,
-                                                   shuffle=True)
-
-    elif im_patch == 'patches_sup':
-        # Use supervision
-        ds = ConvNetTrainingRoadPatches(image_dir, gt_dir, ratio_train=ratio_train)
-        dataset_train = torch.utils.data.DataLoader(ds,
-                                                    batch_size=batch_size,
-                                                    shuffle=True
-                                                    )
-
-        dstest = ConvNetTestRoadPatches(ds)
         dataset_test = torch.utils.data.DataLoader(dstest,
                                                    batch_size=batch_size,
                                                    shuffle=True)
@@ -316,7 +307,8 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
     criterion, categorical = loss_function_from_string(loss_fct_str, pos_weight=pos_weight_tensor)
 
     # load the optimiser
-    optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate, momentum)
+    optimizer = optimizer_from_string(optimizer_str, model.parameters(), learning_rate, momentum,
+                                      weight_decay=weight_decay)
 
     scheduler = None
     if lr_scheduler:
