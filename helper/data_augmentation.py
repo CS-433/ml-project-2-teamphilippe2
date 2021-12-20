@@ -212,8 +212,8 @@ class ConvNetTrainingRoadPatches(Dataset):
         self.patches_train = to_tensor_and_permute(self.patches_train)
         self.patches_test = to_tensor_and_permute(self.patches_test)
 
-        self.y_train = torch.unsqueeze(torch.from_numpy(self.y_train), 1)
-        self.y_test = torch.unsqueeze(torch.from_numpy(self.y_test), 1)
+        self.y_train = torch.unsqueeze(torch.from_numpy(self.y_train).int(), 1)
+        self.y_test = torch.unsqueeze(torch.from_numpy(self.y_test).int(), 1)
 
         self.n_samples = len(self.patches_train)
 
@@ -230,6 +230,18 @@ class ConvNetTrainingRoadPatches(Dataset):
             The test set
         """
         return self.patches_test, self.y_test
+
+    def compute_pos_weights(self):
+        """
+        Compute the weights for the positive samples
+        to use in the loss.
+        Returns:
+            Tensor with the positive weight
+        """
+        # Ratio of nb of negative samples / nb of positive samples
+        nb_pos = self.y_train.sum()
+        nb_neg = self.y_train.shape[0] - nb_pos
+        return nb_neg / nb_pos
 
 
 class ConvNetTestRoadPatches(Dataset):
