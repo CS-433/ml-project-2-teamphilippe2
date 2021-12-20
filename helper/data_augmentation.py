@@ -3,8 +3,9 @@ from torch.utils.data import Dataset
 from torchvision.transforms import *
 from torchvision.transforms.functional import *
 
-from helper.image import get_img_patches
+from helper.image import get_img_patches, get_imgs_gt_patches
 from helper.loading import *
+from models.features_extraction import build_gt_from_patches, value_to_class
 
 
 class RoadTestImages(Dataset):
@@ -33,7 +34,7 @@ class AugmentedRoadImages(Dataset):
     Custom class to load our training dataset
     """
 
-    def __init__(self, img_datapath, gt_datapath, ratio_train, seed):
+    def __init__(self, img_datapath, gt_datapath, ratio_test, seed, autoencoder=False):
         """
         Load and split the dataset
         
@@ -46,7 +47,9 @@ class AugmentedRoadImages(Dataset):
             - ratio_test: 
                 The split ratio of train-test set 
             - seed: 
-                Seed to split the dataset 
+                Seed to split the dataset
+            - autoencoder:
+                Whether the dataset is used to train the autoencoder
         """
         # Load train images
         imgs, gt_imgs = load_images_and_groundtruth(img_datapath, gt_datapath)
@@ -134,7 +137,7 @@ class AugmentedRoadImages(Dataset):
         return imgs, gt_imgs2
 
 
-class OriginalTrainingRoadPatches(Dataset):
+class AutoencoderTrainingRoadPatches(Dataset):
     """
     Original, non augmented training patches.
     """
@@ -159,7 +162,7 @@ class OriginalTrainingRoadPatches(Dataset):
         return self.patches[item], self.patches[item]
 
 
-class OriginalTestRoadPatches(Dataset):
+class AutoencoderTestRoadPatches(Dataset):
     def __init__(self, img_datapath, patch_size=16):
         # Load all test images in folder
         # Keep original size
@@ -184,3 +187,84 @@ class OriginalTestRoadPatches(Dataset):
     def __getitem__(self, item):
         # For autoencoder, target is the original image
         return self.patches[item], self.patches[item]
+
+
+class ConvNetTrainingRoadPatches(Dataset):
+    """
+    Original, non augmented training patches.
+    """
+    def __init__(self, image_dir, gt_dir, patch_size=16, seed=0, ratio_train=0.8):
+        # Load all training images and gt in folder
+        imgs, gt_imgs = load_images_and_groundtruth(image_dir, gt_dir)
+
+        # Get all the patches from the images
+        # np array (nb patches, patch_size, patch_size, 3)
+        patches, gt_patches = get_imgs_gt_patches(imgs, gt_imgs)
+
+        # Labels for each patch
+        y = build_gt_from_patches(gt_patches,
+                                  lambda gt_patch: value_to_class(gt_patch, threshold=0.5))
+
+        # Split data into training and validation set
+        self.patches_train, self.y_train, self.patches_test, self.y_test = split_data(patches, y, ratio_train, seed=seed)
+
+        # Convert to correct Tensor format
+        self.patches_train = to_tensor_and_permute(self.patches_train)
+        self.patches_test = to_tensor_and_permute(self.patches_test)
+
+        self.y_train = torch.unsqueeze(torch.from_numpy(self.y_train), 1)
+        self.y_test = torch.unsqueeze(torch.from_numpy(self.y_test), 1)
+
+        self.n_samples = len(self.patches_train)
+
+    def __len__(self):
+        return self.n_samples
+
+    def __getitem__(self, item):
+        return self.patches_train[item], self.y_train[item]
+
+    def get_test_set(self):
+        """
+        Return the test set corresponding to our dataset
+        Returns:
+            The test set
+        """
+        return self.patches_test, self.y_test
+
+
+class ConvNetTestRoadPatches(Dataset):
+    """
+    Original, non augmented local test patches.
+    """
+    def __init__(self, training_ds):
+        self.test_data, self.test_ground_truth = training_ds.get_test_set()
+        self.len = len(self.test_data)
+
+    def __len__(self):
+        return self.len
+
+    def __getitem__(self, item):
+        return self.test_data[item], self.test_ground_truth[item]
+
+
+class OriginalTestRoadImages(Dataset):
+    def __init__(self, img_datapath, patch_size=16):
+        # Load all test images in folder
+        # Keep original size
+        ids, imgs, _ = load_test_set(img_datapath, test_img_width, test_img_height)
+
+        # imgs is a list of (C, H, W), need numpy (W, H, C)
+        # to extract patches
+        imgs = [torch.permute(img, (2, 1, 0)).numpy() for img in imgs]
+
+        # Convert to correct Tensor format
+        self.imgs = to_tensor_and_permute(imgs)
+
+        self.n_samples = len(self.imgs)
+
+    def __len__(self):
+        return self.n_samples
+
+    def __getitem__(self, item):
+        # For autoencoder, target is the original image
+        return self.imgs[item], self.imgs[item]
