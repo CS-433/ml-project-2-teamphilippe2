@@ -7,16 +7,8 @@
 
 
 ### Environment 
-The training described in the report and the 
-- matplotlib
-- numpy
-- torch
-- torchvision
-- torchgeometry
-- sklearn
-- Pillow
-
-To install all the packages directly, you can simply run the command 
+A list of all the packages (and the corresponding version) required in order to run our code can be found in the requirements.txt file. 
+To quickly install all the packages with the corresponding version, you can simply run the command 
 ```
 pip install -r requirements.txt
 ```
