@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from helper.data_augmentation import OriginalTrainingRoadPatches
+from helper.datasets_patch import AutoencoderTrainingRoadPatches
 from helper.loading import save_numpy
 from helper.neural_net import load_model_weights
 from helper.const import *
@@ -38,7 +38,7 @@ def extract_features_encoder(encoder, image_dir, weights_path):
     encoder = encoder.to(device)
 
     # Dataset to extract the features from
-    dataset = OriginalTrainingRoadPatches(image_dir)
+    dataset = AutoencoderTrainingRoadPatches(image_dir)
     dataloader = DataLoader(dataset, batch_size=1)
 
     # Matrix of extracted features of shape (nb samples, nb features)
@@ -64,3 +64,4 @@ def extract_features_encoder(encoder, image_dir, weights_path):
     print(f'Features saved in {file_path}')
 
     return X
+
