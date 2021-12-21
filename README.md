@@ -19,8 +19,8 @@ We separated the code into multiple files instead of having all the implementati
 ├── helper
     ├── autoencoder_helper.py             # Helper function to extract feature from patches using the auto-encoder
     ├── const.py                          # All the constants used throughout the project
-    ├── data_augmentation.py              # Functions to visualise quote features of the dataset
-    ├── data_augmentation.py              # Functions to visualise quote features of the dataset
+    ├── datasets_image.py                 # Data augmentation for the FCN and Unet neural networks
+    ├── datasets_patch.py                 # Datasets for the Autoencoder network
     ├── image.py                          # Functions to handle images
     ├── loading.py                        # all the loading functions for training and testing dataset
     ├── metrics.py                        # Functions to assess performance of our datasets
