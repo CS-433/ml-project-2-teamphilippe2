@@ -40,7 +40,7 @@ def main():
     print('\n==> Loading model...\n')
     # Load the model
     #model = UNet(3,32)
-    model = FCNet()
+    model = FCNet(channel=64, batch_norm = 64)
     load_model(best_model_weight_path, model)
     
     print('\n==> Predicting labels for the test set...\n')
