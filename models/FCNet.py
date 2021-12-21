@@ -4,10 +4,10 @@ from torch import nn
 
 class FCNet(nn.Module):
     # down sample * nbre à definir + upsample
-    def __init__(self, in_channel=3, batch_norm=True):
+    def __init__(self, in_channel=3, channel=128, batch_norm=True):
         super().__init__()
 
-        channel = 32
+        
         self.res_block1 = ResBlock(in_channel, channel, 2, batch_norm)
         self.res_block2 = ResBlock(channel, channel * 2, 2, batch_norm)
         self.res_block3 = ResBlock(channel * 2, channel * 4, 3, batch_norm)

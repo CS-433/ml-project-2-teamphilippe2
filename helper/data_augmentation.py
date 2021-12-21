@@ -127,6 +127,7 @@ class AugmentedRoadImages(Dataset):
             imgs.append(rotate(img, angle))
             gt_imgs.append(rotate(gt, angle))
             
+        
         # generate cropped rotation of the same image
         rotation_angles = [15, 45, 60, 105, 120, 165, 195, 210, 240, 255, 300, 315]
         crop_center = CenterCrop(200)
