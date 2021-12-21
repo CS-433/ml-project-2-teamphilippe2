@@ -6,9 +6,9 @@ from  torchvision.transforms.functional import resize
 from helper.loading import *
 from helper.submission import *
 from helper.const import *
-from models.predictions import *
-from models.NNET import *
-from models.UNet_orig import *
+from helper.predictions import *
+from models.FCNet import *
+from models.UNet import *
 
 def load_model(weight_path, model):
     """
@@ -40,7 +40,7 @@ def main():
     print('\n==> Loading model...\n')
     # Load the model
     #model = UNet(3,32)
-    model = NNet()
+    model = FCNet(channel=64, batch_norm = 64)
     load_model(best_model_weight_path, model)
     
     print('\n==> Predicting labels for the test set...\n')

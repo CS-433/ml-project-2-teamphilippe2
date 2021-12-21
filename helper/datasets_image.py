@@ -31,6 +31,7 @@ class RoadTestImages(Dataset):
     """
     Custom class for test set, based on a given training set.
     """
+
     def __init__(self, augmented_ds):
         # Get local test set from training set
         self.test_data, self.test_ground_truth = augmented_ds.get_test_set()
@@ -46,7 +47,8 @@ class AugmentedRoadImages(Dataset):
     """
     Custom class to load the images training set
     """
-    def __init__(self, img_datapath, gt_datapath, ratio_train, seed):
+
+    def __init__(self, img_datapath, gt_datapath, ratio_train, seed, custom_rot = True):
         """
         Load and split the dataset
         
@@ -60,6 +62,8 @@ class AugmentedRoadImages(Dataset):
                 The split ratio of train-test set 
             - seed: 
                 Seed to split the dataset
+            - custom_rot: 
+                If we want to do custom rotation (by an angle which is not a multiple of 90)
         """
         # Load train images
         imgs, gt_imgs = load_images_and_groundtruth(img_datapath, gt_datapath)
@@ -79,7 +83,7 @@ class AugmentedRoadImages(Dataset):
         # Perform data augmentation
         for img, gt in zip(imgs_tr, gt_imgs_tr):
             # Add the different transformations to the dataset
-            img_trans, gt_trans = self.transform(img, gt)
+            img_trans, gt_trans = self.transform(img, gt, custom_rot)
             self.all_imgs.extend(img_trans)
             self.gt_imgs.extend(gt_trans)
 
@@ -115,13 +119,15 @@ class AugmentedRoadImages(Dataset):
         """
         return self.test_set[0], self.test_set[1]
 
-    def transform(self, img, gt):
+    def transform(self, img, gt, custom_rot):
         """
         Return multiple transformations of the same image and teh ground truth
         Parameters:
         -----------
             - img: the image we want to transform
             - gt : the corresponding ground truth image
+            -  custom_rot: 
+                If we want to do custom rotation (by an angle which is not a multiple of 90)
         Return:
             - List of transformations (tensors) of the image
             - List of transformations (tensors) of the ground truth image
@@ -132,9 +138,9 @@ class AugmentedRoadImages(Dataset):
 
         imgs = [img]
         gt_imgs = [gt]
-
-        # Generate 30 random crops
-        for i in range(30):
+        nb_crops = 10 if custom_rot else 30
+        # Generate random crops
+        for i in range(nb_crops):
             # Get random crop params of size 200x200 
             i, j, h, w = RandomCrop.get_params(
                 img, output_size=(img.shape[1] // 2, img.shape[2] // 2))
@@ -148,6 +154,15 @@ class AugmentedRoadImages(Dataset):
         for angle in rotation_angles:
             imgs.append(rotate(img, angle))
             gt_imgs.append(rotate(gt, angle))
+        
+        if custom_rot:
+            # generate cropped rotation of the same image
+            rotation_angles = [15, 45, 60, 105, 120, 165, 195, 210, 240, 255, 300, 315]
+            crop_center = CenterCrop(200)
+            resize = Resize([400,400])
+            for angle in rotation_angles:
+                imgs.append(resize(crop_center(rotate(img, angle))))
+                gt_imgs.append(resize(crop_center(rotate(gt, angle))))
 
         # Only select the first dimension to transform back the ground truth to a 2D image
         gt_imgs2 = []
@@ -157,3 +172,22 @@ class AugmentedRoadImages(Dataset):
             gt_imgs2.append(gt[None, :, :])
 
         return imgs, gt_imgs2
+
+    def compute_pos_weight(self):
+        """
+        Compute the reweighting factor for the positive class, i.e. return (nb negative samples)/(nb positive samples)
+        Returns:
+        --------
+            The reweighting factors
+        """
+
+        cur_sum = 0
+        width, height = 0, 0
+
+        for gt in self.gt_imgs:
+            cur_sum += gt.sum()
+            width, height = gt.shape[1], gt.shape[2]
+
+        total_size = width * height * len(self.gt_imgs) - cur_sum
+
+        return total_size / cur_sum
