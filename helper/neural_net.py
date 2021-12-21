@@ -1,14 +1,18 @@
 from datetime import datetime
-from helper.data_augmentation import *
+
+from helper.const import weights_folder, ext_weight_model
+from helper.datasets_image import AugmentedRoadImages, RoadTestImages
+from helper.datasets_patch import AutoencoderTestRoadPatches, AutoencoderTrainingRoadPatches
 from helper.metrics import *
-from models.ConvNet import ConvNet
 from models.FCNet import *
 from models.UNet import *
 from models.autoencoder import AutoEncoder
 from helper.predictions import predict_test_set_nn
+from tqdm import tqdm
+
 
 def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, num_epochs=10, learning_rate=1e-3,
-                   momentum=0.0, batch_size=16, save_weights=True, ratio_train=0.8, seed=1, im_patch=None, 
+                   momentum=0.0, batch_size=16, save_weights=True, ratio_train=0.8, seed=1, im_patch=None,
                    lr_scheduler=False, lr_schedule=(10, 0.1), verbose=True, pos_weight=False):
     """
     Fully train the asked neural network, save the weights and test the accuracy on the test set. 
@@ -57,11 +61,11 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         - f1s_test: the f1 score on the test set obtained during training or an empty list if we use the autoencoder
         - accuracies_test: the accuracies on the test set obtained during training or an empty list if we use the autoencoder
     """
-    
+
     # Load the datasets and the device
     dataset_train, dataset_test, ds, dstest = get_datasets(image_dir, gt_dir, ratio_train, batch_size, im_patch, seed)
     device = get_device()
-    
+
     pos_weight_tensor = None
     if pos_weight:
         weight = ds.compute_pos_weight()
@@ -72,7 +76,7 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
 
     # Get the loss
     criterion, categorical = loss_function_from_string(loss_fct_str, pos_weight_tensor=pos_weight_tensor)
-    
+
     threshold = 0.0 if loss_fct_str == "bcelogit" else 0.5
 
     # Get the optimiser
@@ -80,14 +84,14 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
 
     scheduler = None
     if lr_scheduler:
-       # Use a step lr scheduler
-       scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_schedule[0], gamma=lr_schedule[1])
-    
-    train_losses, test_losses, f1s_test, accuracies_test = train(model, criterion, dataset_train, dataset_test,\
-                                                                 device, optimizer, num_epochs, im_patch=im_patch,\
-                                                                 scheduler=scheduler, print_iterations=verbose,\
-                                                                 categorical=categorical, threshold = threshold)
-    
+        # Use a step lr scheduler
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=lr_schedule[0], gamma=lr_schedule[1])
+
+    train_losses, test_losses, f1s_test, accuracies_test = train(model, criterion, dataset_train, dataset_test,
+                                                                 device, optimizer, num_epochs, im_patch=im_patch,
+                                                                 scheduler=scheduler, print_iterations=verbose,
+                                                                 categorical=categorical, threshold=threshold)
+
     if save_weights:
         save_model(model_str, model, im_patch)
 
@@ -95,20 +99,19 @@ def run_experiment(model_str, loss_fct_str, optimizer_str, image_dir, gt_dir, nu
         print("Predicting pixels...")
         # Compute scores on the local test set 
         img_test, gt_test = ds.get_test_set()
-        
+
         gt_test = [gt.numpy() for gt in gt_test]
 
         preds = predict_test_set_nn(img_test, model, threshold=threshold)
-            
+
         # Display scores
         _, _, _, _ = compute_scores(gt_test, preds)
-    
+
     return train_losses, test_losses, f1s_test, accuracies_test
 
 
-def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iterations=True, 
+def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_epochs, print_iterations=True,
           im_patch=None, scheduler=None, categorical=False, threshold=0.5):
-
     """
     Fully train a neural network
     Parameters:
@@ -156,17 +159,18 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
         # Train an epoch
         model.train()
         loss_sum = 0
-        for batch_x, batch_y in dataset_train:
+        for batch_x, batch_y in tqdm(dataset_train):
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
             # Evaluate the network (forward pass)
             prediction = model(batch_x)
-            
+
             if categorical:
                 # if the loss want categorical tensor, need to convert the tensor in NxCxHxW into NxHxW
                 batch_y = batch_y.squeeze(dim=1).type(torch.int64)
-            
+
             # Evalute the network on the training groundtruth and store loss
+
             loss = criterion(prediction, batch_y)
             loss_sum += loss.item()
 
@@ -176,16 +180,16 @@ def train(model, criterion, dataset_train, dataset_test, device, optimizer, num_
 
             # Update the parameters of the model with a gradient step
             optimizer.step()
-        
+
         train_losses.append(loss_sum)
-        
-        if im_patch=="patches":
+
+        if im_patch == "patches":
             # Evaluate autoencoder performance
             test_loss = evaluate_autoencoder(model, criterion, dataset_test, device, print_iterations, epoch)
             test_losses.append(test_loss)
         else:
             # Evalute classifier performance
-            f1, acc = evalute_classifier(model, criterion, dataset_test, device, print_iterations, epoch, threshold)
+            f1, acc = evaluate_classifier(model,  dataset_test, print_iterations, epoch, threshold)
             f1s_test.append(f1)
             accuracies_test.append(acc)
 
@@ -234,23 +238,20 @@ def evaluate_autoencoder(model, criterion, dataset_test, device, print_iteration
         test_losses.append(t_loss)
         test_losses_sum += t_loss
 
-    if print_iterations and epoch%10 ==0:
+    if print_iterations and epoch % 10 == 0:
         print(f"Epoch {epoch} | Avg test loss: {test_losses_sum / len(dataset_test):.5f}")
     return test_losses_sum
 
-def evalute_classifier(model, criterion, dataset_test, device, print_iterations, epoch, threshold):
+
+def evaluate_classifier(model, dataset_test,  print_iterations, epoch, threshold):
     """
     Evaluate the autoencoder performance on the test set 
     Parameters:
     -----------
         - model:
             The model we wish to assess performances (torch.nn.Module)
-        - criterion:
-            The loss we use during training (torch.nn.Module)
         - dataset_test:
             The test dataset on which we assess performance (torch.utils.data.DataLoader)
-        - device: 
-            The device in which the model is stored 
         - print_iterations:
             Boolean inidicating if we want to print a summary of performance after 10 epochs
         - epoch:
@@ -265,12 +266,12 @@ def evalute_classifier(model, criterion, dataset_test, device, print_iterations,
     # Test the quality on the test set
     # Disable dropout and batch-norm layers for instance
     model.eval()
-    
+
     f1s = []
     accuracies = []
     with torch.no_grad():
         # Evaluate the accuracy on the test set for the other models
-        
+
         for batch_x, batch_y in dataset_test:
             # Predict the class of each pixel in the test set 
             preds = predict_test_set_nn(batch_x, model, threshold=threshold)
@@ -280,12 +281,13 @@ def evalute_classifier(model, criterion, dataset_test, device, print_iterations,
             f1, _, _, accuracy = compute_scores(gt_test, preds, print_values=False)
             f1s.append(f1)
             accuracies.append(accuracy)
-            
+
     mean_f1, mean_acc = np.mean(f1s), np.mean(accuracies)
-    
-    if print_iterations and epoch%10 ==0:
+
+    if print_iterations and epoch % 10 == 0:
         print("Epoch {} | Test F1: {:.5f} | Test accuracy: {:.5f}".format(epoch, mean_f1, mean_acc))
     return mean_f1, mean_acc
+
 
 def loss_function_from_string(loss_fct_str, pos_weight_tensor=None):
     """
@@ -339,21 +341,19 @@ def model_from_string(model_str, device):
         model = FCNet()
     elif model_str == "autoencoder":
         model = AutoEncoder()
-    elif model_str == "convnet":
-        model = ConvNet()
     else:
         raise ValueError(f"Unexpected value {model_str}")
-    
+
     # Move the models to the correct device
     model = model.to(device)
     # Display model statistics
     print(f"Number of parameters in the model {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
     if torch.cuda.is_available():
-        print(f"Cuda memory allocated for training {torch.cuda.memory_allocated()/1024/1024} MB")
+        print(f"Cuda memory allocated for training {torch.cuda.memory_allocated() / 1024 / 1024} MB")
     return model
 
 
-def optimizer_from_string(optimizer_str, params, lr, momentum):
+def optimizer_from_string(optimizer_str, params, lr, momentum, weight_decay=1e-4):
     """
     Return the optimiser corresponding to the given string
     Parameters: 
@@ -366,20 +366,39 @@ def optimizer_from_string(optimizer_str, params, lr, momentum):
             The learning rate we want to apply during training
         - momentum: 
             The momentum we want to include in the optimiser
+        - weight_decay:
+            L2 regularizer coefficient
     Returns: 
     -----------
         - The corresponding optimiser
     """
     if optimizer_str == "adam":
-        return torch.optim.Adam(params, lr=lr)
+        return torch.optim.Adam(params, lr=lr, weight_decay=weight_decay)
     elif optimizer_str == "sgd":
         return torch.optim.SGD(params, lr=lr, momentum=momentum)
     else:
         raise ValueError(f"Unexpected value {optimizer_str}")
-        
 
-def get_datasets(image_dir, gt_dir, ratio_train, batch_size, im_patch,seed):
+
+def get_datasets(image_dir, gt_dir, ratio_train, batch_size, im_patch, seed):
     """
+    Load the dataset to be used with the corresponding model
+    Parameters:
+    -----------
+        - image_dir:
+            Path to the image directory
+        - gt_dir:
+            Path to the ground truth image directory
+        - ratio_train:
+            The ratio of images to be used for training
+        - batch_size :
+            The batch size used during training
+        - im_patch:
+            String indicating whether we are training an autoencoder,
+            and if we use patches or complete images as input. None
+            if we do not train an autoencoder
+        - seed:
+            The seed to be used for the random split between train and test set
     """
     if im_patch == 'patches':
         # Do not use supervision for autoencoder
@@ -421,6 +440,7 @@ def get_datasets(image_dir, gt_dir, ratio_train, batch_size, im_patch,seed):
         dataset_test = torch.utils.data.DataLoader(dstest, batch_size=batch_size, shuffle=True)
     return dataset_train, dataset_test, ds, dstest
 
+
 def get_device():
     """
     Return the device on which to train the neural network, i.e. CUDA if available or CPU
@@ -436,7 +456,8 @@ def get_device():
         print("Things will go much quicker with a GPU")
         device = torch.device("cpu")
     return device
-        
+
+
 def save_model(model_str, model, im_patch):
     """
     Save the model weights in the weights folder
@@ -449,7 +470,7 @@ def save_model(model_str, model, im_patch):
             if we do not train an autoencoder
     """
     # weights_folder and ext_weight_model are two constants defined in helper/const.py
-    
+
     # Get the current time to have a unique file name
     now = datetime.now()
     time = now.strftime("%Y-%m-%d_%H-%M-%S")
@@ -457,7 +478,7 @@ def save_model(model_str, model, im_patch):
     if im_patch == "patches":
         # If we used an autoencoder,
         # separate the weights files
-    
+
         # Save encoder weights
         torch.save(model.encoder.state_dict(),
                    weights_folder + model_str + "/encoder_" + time + ext_weight_model)
@@ -468,6 +489,3 @@ def save_model(model_str, model, im_patch):
     else:
         torch.save(model.state_dict(),
                    weights_folder + model_str + "/" + time + ext_weight_model)
-
-
-

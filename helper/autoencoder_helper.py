@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from helper.data_augmentation import AutoencoderTrainingRoadPatches
+from helper.datasets_patch import AutoencoderTrainingRoadPatches
 from helper.loading import save_numpy
 from helper.neural_net import load_model_weights
 from helper.const import *
