@@ -1,6 +1,7 @@
 import numpy as np
 from helper.image import *
 
+
 def extract_features_from_patches(patches, extract_fct):
     """
         Extracts features from all the given patches
@@ -20,7 +21,8 @@ def extract_features_from_patches(patches, extract_fct):
             np.array of shape (nb patches, nb features)
     """
     return np.asarray([extract_fct(patch) for patch in patches])
-    
+
+
 def build_gt_from_patches(gt_patches, conversion_fct):
     """
         Builds the ground truths vector from the list of the
@@ -41,7 +43,8 @@ def build_gt_from_patches(gt_patches, conversion_fct):
             np.array of shape (nb patches,)
     """
     return np.asarray([conversion_fct(gt_patch) for gt_patch in gt_patches])
-    
+
+
 def value_to_class(gt_patch, threshold=0.25):
     # Compute features for each image patch in groundtruth
     # percentage of pixels > 1 required to assign a foreground label to a patch
@@ -50,6 +53,7 @@ def value_to_class(gt_patch, threshold=0.25):
         return 1
     else:
         return 0
+
 
 def extract_baseline_features(img):
     """
@@ -69,18 +73,19 @@ def extract_baseline_features(img):
     mean_r = np.mean(img[:, :, 0])
     mean_g = np.mean(img[:, :, 1])
     mean_b = np.mean(img[:, :, 2])
-    
+
     # Extract the var of each channel
     var_r = np.var(img[:, :, 0])
     var_g = np.var(img[:, :, 1])
     var_b = np.var(img[:, :, 2])
-    
+
     # Extract the max of each channel
     max_r = np.max(img[:, :, 0])
     max_g = np.max(img[:, :, 1])
     max_b = np.max(img[:, :, 2])
-    
+
     return np.array([mean_r, mean_g, mean_b, var_r, var_g, var_b, max_r, max_g, max_b])
+
 
 def standardize_features(X, means=None, stds=None):
     """
@@ -99,7 +104,6 @@ def standardize_features(X, means=None, stds=None):
     """
     if means is None or stds is None:
         means = np.mean(X, axis=0)
-        stds = np.std(X, axis=0) 
-        
-    
+        stds = np.std(X, axis=0)
+
     return (X - means) / stds, means, stds
