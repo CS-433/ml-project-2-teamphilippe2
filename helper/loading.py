@@ -5,6 +5,7 @@ import torch
 from torchvision.transforms.functional import resize
 from helper.const import *
 
+
 def load_image(image_file):
     """
     Load one image from the image file
