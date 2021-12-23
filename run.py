@@ -19,14 +19,17 @@ def load_model(weight_path, model):
         - model : the model object we need to load the weights into
     """
     print("Used weights "+weight_path)
-    # Restore the state of the model
-    model.load_state_dict(torch.load(weight_path))
     
-    device = torch.device("cuda")
+    
+    
     # If a GPU is available, use it
     if not torch.cuda.is_available():
-        print("Things will go much quicker with a GPU")
         device = torch.device("cpu")
+        model.load_state_dict(torch.load(weight_path, map_location=device))
+    else:
+        # Restore the state of the model
+        model.load_state_dict(torch.load(weight_path))
+        device = torch.device("cuda")
     
     # Transfer the model to the either the GPU or the CPU
     model.to(device)
@@ -39,8 +42,7 @@ def main():
     
     print('\n==> Loading model...\n')
     # Load the model
-    #model = UNet(3,32)
-    model = FCNet(channel=64, batch_norm = 64)
+    model = FCNet(channel=64, batch_norm = True)
     load_model(best_model_weight_path, model)
     
     print('\n==> Predicting labels for the test set...\n')
