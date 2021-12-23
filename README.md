@@ -12,6 +12,11 @@ To quickly install all the packages with the corresponding version, you can simp
 ```
 pip install -r requirements.txt
 ```
+
+We used the following frameworks for our models :
+ - Sklearn : baseline models
+ - PyTorch : deep learning models
+
 ### Structure of the project
 We separated the code into multiple files instead of having all the implementations in a single huge unreadable file.
 ```
