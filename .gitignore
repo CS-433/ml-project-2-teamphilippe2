@@ -1,5 +1,4 @@
 *.pyc
 *.ipynb_checkpoints
 .idea*
-*.csv
 *.DS_Store
